@@ -1,5 +1,5 @@
 #!/bin/bash
 source /usr/share/yunohost/helpers
-ynh_print_info "Sauvegarde de pax (les parties sont dans le dossier de données)"
-ynh_backup --src_path="/etc/nginx/conf.d/$domain.d/$app.conf"
-ynh_backup --src_path="/etc/systemd/system/$app.service"
+# Packaging v2 / helpers 2.1 : install_dir, data_dir, nginx et systemd sont sauvegardés
+# automatiquement ; les parties sont dans data_dir. Rien d'autre à faire.
+ynh_print_info "Sauvegarde de pax : dossier de données (parties, réglages)"
