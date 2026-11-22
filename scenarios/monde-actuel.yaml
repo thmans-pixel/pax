@@ -1,0 +1,207 @@
+# Monde actuel — départ le 22 novembre 2026.
+#
+# Faits vérifiés dans la presse du 10 au 22 novembre 2026 (Al Jazeera, Reuters, AP, PRIO,
+# gov.uk, Japan Kantei, CFR) : guerre en Ukraine et pourparlers d'Abou Dhabi, Gaza, guerre
+# contre l'Iran, Venezuela, Royaume-Uni (Burnham), Japon (Takaichi), France, Allemagne,
+# élections au Brésil et en Israël. Le reste vient de connaissances antérieures à juin 2026.
+# À RELIRE par Thibault avant de s'y fier.
+
+id: monde-actuel
+nom: Monde actuel
+date_depart: 2026-11-22
+description: >
+  Le monde à la fin novembre 2026 : une guerre en Ukraine qui entre dans sa cinquième année,
+  un cessez-le-feu à Gaza qui se défait, un affrontement ouvert entre l'Iran et les
+  États-Unis, une Europe qui cherche sa place dans les négociations, et une trêve
+  commerciale fragile entre Washington et Pékin.
+
+contexte: |
+  Situation au 22 novembre 2026.
+  UKRAINE : la guerre dure depuis février 2022 (plus de 4 ans et demi). Des pourparlers
+  tripartites États-Unis / Ukraine / Russie ont repris à Abou Dhabi les 10 et 11 novembre
+  après neuf mois d'interruption : échange de prisonniers, aucune percée. Witkoff et Kushner
+  ont ensuite vu Poutine à Moscou puis Zelensky à Dublin. Moscou refuse la présence des
+  Européens aux négociations et toute troupe européenne en Ukraine après un cessez-le-feu ;
+  le front de 1 200 km reste actif, avec des frappes sur Kiev. Le Donbass est le point dur.
+  GAZA : le cessez-le-feu d'octobre 2025 (plan en 20 points de Trump, Conseil de la paix)
+  est à bout de souffle. Israël tient environ 53 % du territoire derrière la « ligne jaune »
+  et a lancé le 18 novembre sa première offensive terrestre depuis la trêve, au centre de
+  Gaza. Le Conseil de la paix met en garde contre un effondrement imminent et doit présenter
+  son rapport à New York fin novembre.
+  ISRAËL : élections le 27 octobre 2026 ; le bloc de Netanyahou a 53 sièges, l'opposition de
+  Gadi Eisenkot 48, les partis arabes 19 : personne n'a la majorité (61). Netanyahou est
+  Premier ministre sortant ; la formation du gouvernement est en cours.
+  IRAN : les États-Unis et Israël ont attaqué l'Iran le 28 février 2026 (le guide Ali
+  Khamenei a été tué), après la guerre de douze jours de juin 2025. Mojtaba Khamenei lui a
+  succédé en mars. Un cessez-le-feu fragile tient mal : le détroit d'Ormuz est perturbé,
+  des navires sont attaqués, les États-Unis ont frappé des installations dans le sud de
+  l'Iran et l'Iran a visé des bases à Bahreïn et au Koweït (mi-novembre). Des négociations
+  nucléaires passent par le Qatar ; Trump envisage de nouvelles frappes.
+  ÉTATS-UNIS : Donald Trump est président, JD Vance vice-président. Les républicains ont subi
+  des pertes aux élections de mi-mandat du 3 novembre ; le nouveau Congrès entre en fonction
+  le 3 janvier 2027. Trêve commerciale avec la Chine depuis le sommet de Busan (octobre
+  2025), sous tension (Taïwan, excédent commercial record de la Chine, contrôle des
+  exportations d'IA).
+  VENEZUELA : Nicolás Maduro a été capturé par les États-Unis en janvier 2026 et est détenu à
+  New York. Delcy Rodríguez gouverne comme présidente par intérim ; Washington contrôle les
+  ventes de pétrole et parraine des pourparlers avec l'opposition (María Corina Machado).
+  EUROPE : Royaume-Uni, Andy Burnham Premier ministre depuis le 20 juillet 2026 (Starmer a
+  démissionné). France, Emmanuel Macron président jusqu'en 2027, Sébastien Lecornu Premier
+  ministre, présidentielle en avril 2027. Allemagne, Friedrich Merz très affaibli par des
+  défaites régionales en septembre, coalition CDU-SPD. Les Européens réclament une place dans
+  les négociations sur l'Ukraine.
+  ASIE : Japon, Sanae Takaichi Première ministre après une victoire écrasante aux législatives.
+  BRÉSIL : Lula a été réélu le 25 octobre 2026 (51,8 %) ; Flávio Bolsonaro conteste le résultat.
+
+chiffres_defaut: {economie: 25, armee: 22, stabilite: 50, influence: 12}
+
+ecarts:
+  - "Dirigeants confirmés par la presse de novembre 2026 : Trump, Poutine, Zelensky, Burnham, Macron/Lecornu, Merz, Takaichi, Netanyahou (sortant), Mojtaba Khamenei, Lula, Delcy Rodríguez."
+  - "Dirigeants NON revérifiés (mandats en cours d'après mes connaissances de juin 2026) : Xi Jinping, Modi, Meloni, Sánchez, Tusk, Erdoğan, Mohammed ben Salmane, al-Sissi, Shehbaz Sharif, Lee Jae-myung, Kim Jong Un, Lai Ching-te, Sheinbaum, Milei, Carney, Albanese, Ramaphosa, Tinubu, Prabowo, Abbas."
+  - "Les territoires sont les pays actuels : la Crimée et les zones occupées du Donbass restent à l'Ukraine sur la carte ; l'occupation est portée par la guerre et par les règles."
+  - "Gaza et la Cisjordanie sont un seul territoire (Palestine) sur le fond de carte ; le Sahara occidental, le Somaliland et Chypre-Nord apparaissent comme territoires distincts."
+  - "Non vérifiés non plus : la candidature de Zemmour et le renoncement de Macron cités dans les règles, et Mette Frederiksen au Danemark."
+  - "Les chiffres (économie, armée, stabilité, influence) sont des estimations de jeu, pas des mesures."
+
+nations:
+  - {id: etats-unis, nom: États-Unis, couleur: "#3c6fb4", dirigeant: Donald Trump, regime: République présidentielle, majeure: true, economie: 95, armee: 95, stabilite: 55, influence: 95, territoires: [USA, PRI]}
+  - {id: chine, nom: Chine, couleur: "#c0392b", dirigeant: Xi Jinping, regime: État à parti unique, majeure: true, economie: 88, armee: 82, stabilite: 75, influence: 85, territoires: [CHN]}
+  - {id: russie, nom: Russie, couleur: "#7d5a8c", dirigeant: Vladimir Poutine, regime: République présidentielle autoritaire, majeure: true, economie: 45, armee: 75, stabilite: 55, influence: 60, territoires: [RUS]}
+  - {id: inde, nom: Inde, couleur: "#e8913a", dirigeant: Narendra Modi, regime: République parlementaire, majeure: true, economie: 75, armee: 70, stabilite: 70, influence: 62, territoires: [IND]}
+  - {id: japon, nom: Japon, couleur: "#d96c7e", dirigeant: Sanae Takaichi, regime: Monarchie parlementaire, majeure: true, economie: 80, armee: 55, stabilite: 72, influence: 62, territoires: [JPN]}
+  - {id: allemagne, nom: Allemagne, couleur: "#5d6b78", dirigeant: Friedrich Merz, regime: République fédérale (coalition CDU-SPD), majeure: true, economie: 80, armee: 48, stabilite: 55, influence: 66, territoires: [DEU]}
+  - {id: france, nom: France, couleur: "#4a7fd0", dirigeant: Emmanuel Macron, regime: "République semi-présidentielle (Premier ministre : Sébastien Lecornu)", majeure: true, economie: 72, armee: 68, stabilite: 42, influence: 68, territoires: [FRA, NCL, ATF]}
+  - {id: royaume-uni, nom: Royaume-Uni, couleur: "#a8323e", dirigeant: Andy Burnham, regime: Monarchie parlementaire, majeure: true, economie: 72, armee: 62, stabilite: 55, influence: 66, territoires: [GBR, FLK]}
+  - {id: italie, nom: Italie, couleur: "#4fa37a", dirigeant: Giorgia Meloni, regime: République parlementaire, majeure: true, economie: 65, armee: 50, stabilite: 58, influence: 50, territoires: [ITA]}
+  - {id: espagne, nom: Espagne, couleur: "#d4a017", dirigeant: Pedro Sánchez, regime: Monarchie parlementaire, majeure: false, economie: 58, armee: 40, stabilite: 55, influence: 40, territoires: [ESP]}
+  - {id: pologne, nom: Pologne, couleur: "#c9506a", dirigeant: Donald Tusk, regime: République parlementaire, majeure: false, economie: 55, armee: 62, stabilite: 62, influence: 45, territoires: [POL]}
+  - {id: danemark, nom: Danemark, couleur: "#9c4a4a", dirigeant: Mette Frederiksen, regime: Monarchie parlementaire, majeure: false, economie: 55, armee: 28, stabilite: 78, influence: 30, territoires: [DNK, GRL]}
+  - {id: ukraine, nom: Ukraine, couleur: "#e6c229", dirigeant: Volodymyr Zelensky, regime: République semi-présidentielle en guerre, majeure: true, economie: 20, armee: 70, stabilite: 45, influence: 40, territoires: [UKR]}
+  - {id: turquie, nom: Turquie, couleur: "#b5533c", dirigeant: Recep Tayyip Erdoğan, regime: République présidentielle, majeure: true, economie: 55, armee: 65, stabilite: 52, influence: 55, territoires: [TUR]}
+  - {id: israel, nom: Israël, couleur: "#5aa7c9", dirigeant: Benjamin Netanyahou, regime: "République parlementaire (gouvernement sortant, coalition à former)", majeure: true, economie: 55, armee: 80, stabilite: 42, influence: 50, territoires: [ISR]}
+  - {id: palestine, nom: Palestine, couleur: "#6b8f4e", dirigeant: Mahmoud Abbas, regime: "Autorité palestinienne en Cisjordanie ; Hamas à Gaza", majeure: false, economie: 5, armee: 15, stabilite: 12, influence: 20, territoires: [PSX]}
+  - {id: iran, nom: Iran, couleur: "#2f7a5a", dirigeant: Mojtaba Khamenei, regime: "République islamique (président : Masoud Pezeshkian)", majeure: true, economie: 30, armee: 55, stabilite: 35, influence: 50, territoires: [IRN]}
+  - {id: arabie-saoudite, nom: Arabie saoudite, couleur: "#3f8f4a", dirigeant: Mohammed ben Salmane, regime: Monarchie absolue, majeure: true, economie: 60, armee: 55, stabilite: 70, influence: 55, territoires: [SAU]}
+  - {id: egypte, nom: Égypte, couleur: "#c8a45a", dirigeant: Abdel Fattah al-Sissi, regime: République présidentielle, majeure: false, economie: 38, armee: 52, stabilite: 55, influence: 38, territoires: [EGY]}
+  - {id: pakistan, nom: Pakistan, couleur: "#2f6f4a", dirigeant: Shehbaz Sharif, regime: République parlementaire (armée influente), majeure: true, economie: 35, armee: 62, stabilite: 45, influence: 40, territoires: [PAK]}
+  - {id: coree-du-sud, nom: Corée du Sud, couleur: "#6a8fd6", dirigeant: Lee Jae-myung, regime: République présidentielle, majeure: false, economie: 68, armee: 66, stabilite: 55, influence: 50, territoires: [KOR]}
+  - {id: coree-du-nord, nom: Corée du Nord, couleur: "#8c2f3a", dirigeant: Kim Jong Un, regime: Dictature à parti unique, majeure: false, economie: 15, armee: 62, stabilite: 70, influence: 30, territoires: [PRK]}
+  - {id: taiwan, nom: Taïwan, couleur: "#4bb0a0", dirigeant: Lai Ching-te, regime: République semi-présidentielle, majeure: false, economie: 62, armee: 52, stabilite: 62, influence: 38, territoires: [TWN]}
+  - {id: bresil, nom: Brésil, couleur: "#4cae4f", dirigeant: Luiz Inácio Lula da Silva, regime: République présidentielle, majeure: true, economie: 62, armee: 50, stabilite: 58, influence: 52, territoires: [BRA]}
+  - {id: mexique, nom: Mexique, couleur: "#a0814a", dirigeant: Claudia Sheinbaum, regime: République présidentielle, majeure: false, economie: 55, armee: 40, stabilite: 50, influence: 42, territoires: [MEX]}
+  - {id: argentine, nom: Argentine, couleur: "#7fb3d5", dirigeant: Javier Milei, regime: République présidentielle, majeure: false, economie: 40, armee: 32, stabilite: 48, influence: 30, territoires: [ARG]}
+  - {id: canada, nom: Canada, couleur: "#d45a5a", dirigeant: Mark Carney, regime: Monarchie parlementaire, majeure: false, economie: 70, armee: 40, stabilite: 70, influence: 48, territoires: [CAN]}
+  - {id: australie, nom: Australie, couleur: "#d1a03a", dirigeant: Anthony Albanese, regime: Monarchie parlementaire, majeure: false, economie: 68, armee: 45, stabilite: 72, influence: 45, territoires: [AUS]}
+  - {id: afrique-du-sud, nom: Afrique du Sud, couleur: "#6b9a3a", dirigeant: Cyril Ramaphosa, regime: République parlementaire (gouvernement d'unité nationale), majeure: false, economie: 40, armee: 38, stabilite: 48, influence: 38, territoires: [ZAF]}
+  - {id: nigeria, nom: Nigéria, couleur: "#3a9a6a", dirigeant: Bola Tinubu, regime: République présidentielle, majeure: false, economie: 32, armee: 35, stabilite: 38, influence: 36, territoires: [NGA]}
+  - {id: indonesie, nom: Indonésie, couleur: "#cf5f3a", dirigeant: Prabowo Subianto, regime: République présidentielle, majeure: false, economie: 50, armee: 42, stabilite: 62, influence: 42, territoires: [IDN]}
+  - {id: venezuela, nom: Venezuela, couleur: "#c9b23a", dirigeant: Delcy Rodríguez, regime: "Gouvernement par intérim sous supervision américaine (pétrole)", majeure: false, economie: 18, armee: 35, stabilite: 25, influence: 18, territoires: [VEN]}
+
+relations:
+  # États-Unis
+  - [etats-unis, royaume-uni, 55]
+  - [etats-unis, france, 30]
+  - [etats-unis, allemagne, 35]
+  - [etats-unis, japon, 65]
+  - [etats-unis, israel, 70]
+  - [etats-unis, iran, -90]
+  - [etats-unis, ukraine, 40]
+  - [etats-unis, russie, -30]
+  - [etats-unis, chine, -25]
+  - [etats-unis, inde, 25]
+  - [etats-unis, bresil, -10]
+  - [etats-unis, venezuela, -15]
+  - [etats-unis, canada, 20]
+  - [etats-unis, mexique, 10]
+  - [etats-unis, arabie-saoudite, 50]
+  - [etats-unis, taiwan, 45]
+  - [etats-unis, coree-du-sud, 55]
+  - [etats-unis, pakistan, 25]
+  - [etats-unis, turquie, 10]
+  - [etats-unis, danemark, -20]
+  # Russie et Chine
+  - [russie, ukraine, -100]
+  - [russie, chine, 65]
+  - [russie, iran, 40]
+  - [russie, inde, 40]
+  - [russie, coree-du-nord, 60]
+  - [russie, allemagne, -70]
+  - [russie, france, -65]
+  - [russie, royaume-uni, -75]
+  - [russie, pologne, -80]
+  - [chine, japon, -45]
+  - [chine, taiwan, -70]
+  - [chine, inde, -25]
+  - [chine, coree-du-nord, 55]
+  - [chine, pakistan, 70]
+  - [chine, iran, 35]
+  - [chine, bresil, 40]
+  # Europe
+  - [france, allemagne, 50]
+  - [france, royaume-uni, 55]
+  - [allemagne, royaume-uni, 50]
+  - [france, ukraine, 55]
+  - [allemagne, ukraine, 50]
+  - [royaume-uni, ukraine, 60]
+  - [pologne, ukraine, 45]
+  - [pologne, allemagne, 30]
+  - [italie, france, 30]
+  - [espagne, france, 40]
+  - [france, israel, -20]
+  - [royaume-uni, israel, -5]
+  - [allemagne, israel, 35]
+  - [turquie, israel, -70]
+  - [turquie, russie, 10]
+  - [turquie, france, -10]
+  # Moyen-Orient
+  - [israel, iran, -100]
+  - [israel, palestine, -95]
+  - [israel, arabie-saoudite, -15]
+  - [iran, arabie-saoudite, -35]
+  - [egypte, israel, -20]
+  - [iran, palestine, 40]
+  # Asie et reste du monde
+  - [japon, coree-du-sud, 30]
+  - [coree-du-sud, coree-du-nord, -85]
+  - [inde, pakistan, -75]
+  - [inde, japon, 55]
+  - [bresil, venezuela, 15]
+  - [australie, royaume-uni, 55]
+  - [australie, etats-unis, 55]
+  - [canada, royaume-uni, 55]
+  - [afrique-du-sud, etats-unis, -20]
+  - [afrique-du-sud, bresil, 40]
+  - [argentine, etats-unis, 40]
+
+guerres:
+  - nom: Guerre en Ukraine
+    camp_a: [russie]
+    camp_b: [ukraine]
+    depuis: 2022-02-24
+  - nom: Guerre à Gaza
+    camp_a: [israel]
+    camp_b: [palestine]
+    depuis: 2023-10-07
+  - nom: Guerre contre l'Iran
+    camp_a: [etats-unis, israel]
+    camp_b: [iran]
+    depuis: 2026-02-28
+
+regles:
+  - date: 2026-11-30
+    texte: >
+      Fin novembre : le Conseil de la paix de Trump présente à New York son rapport sur le
+      cessez-le-feu de Gaza, qu'il juge au bord de l'effondrement.
+  - date: 2027-01-03
+    texte: >
+      Le nouveau Congrès américain entre en fonction ; les démocrates et une partie des
+      républicains veulent une loi pour mettre fin à la guerre contre l'Iran.
+  - date: 2027-04-01
+    texte: >
+      Élection présidentielle française (premier tour prévu en avril 2027). Macron ne se
+      représente pas ; Éric Zemmour a annoncé sa candidature le 10 novembre 2026.
+  - texte: >
+      Toute décision d'un joueur peut changer le cours des événements ; ces repères datés
+      sont des échéances connues, pas des certitudes.
+
+conseil_nations: [etats-unis, chine, russie, france, royaume-uni, inde, ukraine, israel, iran, japon, bresil, allemagne]

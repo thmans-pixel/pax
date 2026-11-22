@@ -1,0 +1,173 @@
+# Seconde Guerre mondiale — 1er septembre 1939 (l'Allemagne envahit la Pologne).
+#
+# Les territoires sont les pays actuels ; ce fichier réaffecte ceux dont le propriétaire
+# de 1939 diffère (empires coloniaux, annexions de l'Axe, URSS, Yougoslavie). Les pays
+# indépendants en 1939 avec des frontières proches des actuelles ne sont pas listés : ils
+# restent des nations mineures sous leur nom moderne (voir `ecarts`).
+# Les événements à venir (17 septembre, 1940…) sont dans `regles`, pas sur la carte.
+
+id: seconde-guerre-1939
+nom: Seconde Guerre mondiale
+date_depart: 1939-09-01
+description: >
+  L'aube du 1er septembre 1939 : la Wehrmacht franchit la frontière polonaise. L'Axe est
+  conquérant, les empires coloniaux couvrent le globe, l'Union soviétique vient de signer un
+  pacte avec Berlin et les États-Unis restent neutres. Menez une puissance à travers le plus
+  grand conflit de l'Histoire.
+
+contexte: |
+  Au matin du 1er septembre 1939, l'Allemagne nazie attaque la Pologne sans déclaration de
+  guerre. Le Royaume-Uni (garantie du 31 mars 1939, traité d'assistance du 25 août) et la
+  France se sont engagés à défendre la Pologne ; leurs ultimatums à Berlin n'ont pas encore
+  été formulés. Le pacte germano-soviétique du 23 août contient un protocole secret qui
+  partage l'Europe de l'Est entre Berlin et Moscou. L'Italie est liée à l'Allemagne par le
+  Pacte d'acier (mai 1939) mais n'est pas prête à la guerre. Le Japon est enlisé en Chine
+  depuis 1937 et vient de subir une défaite face aux Soviétiques à Khalkhin Gol. Les
+  États-Unis, isolationnistes, sont tenus par leurs lois de neutralité. La guerre civile
+  espagnole s'est terminée en avril : Franco est vainqueur. La technologie est celle de
+  l'époque : chars, aviation, sous-marins, radio ; pas d'arme nucléaire ni de radar généralisé.
+  Les puissances coloniales fondent leurs forces sur leurs empires.
+
+chiffres_defaut: {economie: 20, armee: 18, stabilite: 50, influence: 10}
+
+ecarts:
+  - "Les contours sont ceux d'aujourd'hui. L'ouest de l'Ukraine et de la Biélorussie (polonais en 1939) figure dans l'URSS ; la Pologne actuelle comprend la Silésie et la Poméranie, allemandes en 1939 ; Kaliningrad (Prusse-Orientale allemande) figure dans l'URSS."
+  - "Les pays baltes (Estonie, Lettonie, Lituanie) et la Finlande sont indépendants en 1939 ; leur annexion ou leur guerre avec l'URSS est décrite dans les règles. La Moldavie est roumaine (Bessarabie)."
+  - "La Slovaquie est un État indépendant client du Reich, qui participe à l'invasion de la Pologne ; la Hongrie, la Bulgarie, l'Égypte, l'Irak, l'Iran, la Turquie, la Thaïlande (Siam), l'Éthiopie (italienne), etc. sont des nations mineures."
+  - "La Mandchourie, occupée par le Japon, n'est pas découpée : la Chine garde la totalité de son territoire actuel, et le Japon est en guerre contre elle."
+  - "Les Dominions (Canada, Australie, Nouvelle-Zélande, Afrique du Sud) sont des nations distinctes, liées au Royaume-Uni et pas encore en guerre le 1er septembre."
+  - "Le Danemark possède le Groenland ; l'Islande, en union personnelle avec lui, reste une nation mineure."
+  - "Les chiffres sont des estimations de jeu, pas des mesures."
+
+nations:
+  - {id: allemagne, nom: Allemagne, couleur: "#4a4a4a", dirigeant: Adolf Hitler, regime: Régime nazi (Troisième Reich), majeure: true, economie: 78, armee: 82, stabilite: 70, influence: 75, territoires: [DEU, AUT, CZE]}
+  - {id: royaume-uni, nom: Royaume-Uni, couleur: "#b03a48", dirigeant: Neville Chamberlain, regime: Monarchie parlementaire et empire, majeure: true, economie: 80, armee: 60, stabilite: 75, influence: 85, territoires: [GBR, FLK, IND, PAK, BGD, LKA, MMR, MYS, BRN, SDN, KEN, UGA, TZA, ZMB, ZWE, MWI, NGA, GHA, SLE, GMB, SOL, BWA, LSO, SWZ, CYP, JAM, BHS, BLZ, GUY, TTO, FJI, SLB, VUT, ISR, PSX, JOR, KWT, QAT, ARE]}
+  - {id: france, nom: France, couleur: "#4a7fd0", dirigeant: Édouard Daladier, regime: IIIe République et empire colonial, majeure: true, economie: 70, armee: 68, stabilite: 55, influence: 72, territoires: [FRA, NCL, ATF, DZA, TUN, MAR, SYR, LBN, MDG, MRT, SEN, MLI, NER, TCD, GIN, CIV, BFA, BEN, TGO, CMR, GAB, COG, CAF, VNM, LAO, KHM, DJI]}
+  - {id: urss, nom: Union soviétique, couleur: "#9b2a2a", dirigeant: Joseph Staline, regime: Dictature communiste, majeure: true, economie: 72, armee: 70, stabilite: 50, influence: 65, territoires: [RUS, UKR, BLR, GEO, ARM, AZE, KAZ, UZB, TKM, TJK, KGZ]}
+  - {id: italie, nom: Italie, couleur: "#4fa37a", dirigeant: Benito Mussolini, regime: Régime fasciste (roi Victor-Emmanuel III), majeure: true, economie: 48, armee: 55, stabilite: 60, influence: 50, territoires: [ITA, ALB, LBY, ETH, ERI, SOM]}
+  - {id: japon, nom: Japon, couleur: "#d96c7e", dirigeant: "Empereur Hirohito (Premier ministre Nobuyuki Abe)", regime: Empire militariste, majeure: true, economie: 60, armee: 70, stabilite: 60, influence: 58, territoires: [JPN, KOR, PRK, TWN]}
+  - {id: etats-unis, nom: États-Unis, couleur: "#3c6fb4", dirigeant: Franklin D. Roosevelt, regime: République présidentielle neutre, majeure: true, economie: 92, armee: 30, stabilite: 72, influence: 65, territoires: [USA, PRI, PHL]}
+  - {id: pologne, nom: Pologne, couleur: "#c9506a", dirigeant: "Président Ignacy Mościcki (maréchal Rydz-Śmigły)", regime: République autoritaire, majeure: false, economie: 30, armee: 42, stabilite: 55, influence: 30, territoires: [POL]}
+  - {id: chine, nom: Chine, couleur: "#c8a02a", dirigeant: Chiang Kaï-chek, regime: République de Chine en guerre, majeure: true, economie: 15, armee: 40, stabilite: 20, influence: 25, territoires: [CHN]}
+  - {id: pays-bas, nom: Pays-Bas, couleur: "#e08a3a", dirigeant: Reine Wilhelmine, regime: Monarchie parlementaire neutre et empire colonial, majeure: false, economie: 45, armee: 18, stabilite: 72, influence: 30, territoires: [NLD, SUR, IDN]}
+  - {id: belgique, nom: Belgique, couleur: "#a06a3a", dirigeant: Léopold III, regime: Monarchie parlementaire neutre et colonie, majeure: false, economie: 42, armee: 22, stabilite: 68, influence: 25, territoires: [BEL, COD, RWA, BDI]}
+  - {id: espagne, nom: Espagne, couleur: "#d4a017", dirigeant: Francisco Franco, regime: Dictature (après la guerre civile), majeure: false, economie: 15, armee: 35, stabilite: 35, influence: 18, territoires: [ESP, GNQ, SAH]}
+  - {id: portugal, nom: Portugal, couleur: "#3f8f6a", dirigeant: António de Oliveira Salazar, regime: Estado Novo neutre et empire colonial, majeure: false, economie: 22, armee: 15, stabilite: 70, influence: 20, territoires: [PRT, AGO, MOZ, GNB, TLS]}
+  - {id: danemark, nom: Danemark, couleur: "#9c4a4a", dirigeant: Roi Christian X (Premier ministre Thorvald Stauning), regime: Monarchie parlementaire neutre, majeure: false, economie: 40, armee: 8, stabilite: 80, influence: 20, territoires: [DNK, GRL]}
+  - {id: roumanie, nom: Roumanie, couleur: "#b58a4a", dirigeant: Carol II, regime: Dictature royale, majeure: false, economie: 28, armee: 35, stabilite: 45, influence: 22, territoires: [ROU, MDA]}
+  - {id: yougoslavie, nom: Yougoslavie, couleur: "#5a7fa8", dirigeant: Prince Paul (régent), regime: Monarchie, majeure: false, economie: 22, armee: 30, stabilite: 40, influence: 20, territoires: [SRB, HRV, SVN, BIH, MNE, MKD, KOS]}
+  - {id: canada, nom: Canada, couleur: "#d45a5a", dirigeant: William Lyon Mackenzie King, regime: Dominion britannique, majeure: false, economie: 45, armee: 15, stabilite: 80, influence: 28, territoires: [CAN]}
+  - {id: australie, nom: Australie, couleur: "#d1a03a", dirigeant: Robert Menzies, regime: Dominion britannique, majeure: false, economie: 38, armee: 15, stabilite: 75, influence: 25, territoires: [AUS, PNG]}
+  - {id: nouvelle-zelande, nom: Nouvelle-Zélande, couleur: "#7aa84a", dirigeant: Michael Joseph Savage, regime: Dominion britannique, majeure: false, economie: 25, armee: 10, stabilite: 80, influence: 18, territoires: [NZL]}
+  - {id: afrique-du-sud, nom: Afrique du Sud, couleur: "#6b9a3a", dirigeant: J. B. M. Hertzog, regime: Dominion britannique (partagé sur la guerre), majeure: false, economie: 32, armee: 18, stabilite: 55, influence: 25, territoires: [ZAF, NAM]}
+
+relations:
+  # Allemagne
+  - [allemagne, royaume-uni, -55]
+  - [allemagne, france, -55]
+  - [allemagne, pologne, -85]
+  - [allemagne, urss, 25]
+  - [allemagne, italie, 70]
+  - [allemagne, japon, 35]
+  - [allemagne, etats-unis, -40]
+  - [allemagne, pays_svk, 60]
+  - [allemagne, pays_hun, 40]
+  - [allemagne, espagne, 35]
+  - [allemagne, roumanie, 10]
+  - [allemagne, danemark, 5]
+  # Alliés occidentaux
+  - [royaume-uni, france, 75]
+  - [royaume-uni, pologne, 55]
+  - [france, pologne, 55]
+  - [royaume-uni, etats-unis, 55]
+  - [france, etats-unis, 45]
+  - [royaume-uni, chine, 30]
+  - [etats-unis, chine, 45]
+  - [royaume-uni, canada, 70]
+  - [royaume-uni, australie, 75]
+  - [royaume-uni, nouvelle-zelande, 80]
+  - [royaume-uni, afrique-du-sud, 55]
+  - [royaume-uni, espagne, -10]
+  - [pologne, roumanie, 50]
+  - [france, belgique, 50]
+  - [royaume-uni, belgique, 45]
+  - [royaume-uni, pays-bas, 50]
+  - [royaume-uni, portugal, 55]
+  # URSS
+  - [urss, pologne, -70]
+  - [urss, japon, -60]
+  - [urss, royaume-uni, -35]
+  - [urss, france, -35]
+  - [urss, etats-unis, -30]
+  - [urss, pays_mng, 70]
+  # Axe et Pacifique
+  - [italie, royaume-uni, -35]
+  - [italie, france, -45]
+  - [italie, espagne, 50]
+  - [japon, chine, -95]
+  - [japon, etats-unis, -40]
+  - [japon, royaume-uni, -35]
+  - [japon, pays-bas, -15]
+  - [etats-unis, pays-bas, 25]
+
+guerres:
+  - nom: Invasion de la Pologne
+    camp_a: [allemagne, pays_svk]
+    camp_b: [pologne]
+    depuis: 1939-09-01
+  - nom: Guerre sino-japonaise
+    camp_a: [japon]
+    camp_b: [chine]
+    depuis: 1937-07-07
+  - nom: Combats de Khalkhin Gol
+    camp_a: [urss, pays_mng]
+    camp_b: [japon]
+    depuis: 1939-05-11
+
+regles:
+  - date: 1939-09-03
+    texte: >
+      Dans l'histoire réelle, le Royaume-Uni puis la France déclarent la guerre à l'Allemagne
+      le 3 septembre, faute de retrait de ses troupes de Pologne ; les Dominions suivent dans
+      les jours qui suivent (Australie et Nouvelle-Zélande le 3, Canada le 10, Afrique du Sud
+      le 6 après la chute du gouvernement Hertzog).
+  - date: 1939-09-15
+    texte: >
+      L'armistice de Khalkhin Gol (15-16 septembre) met fin aux combats entre l'URSS et le
+      Japon : le Japon se tourne vers le sud.
+  - date: 1939-09-17
+    texte: >
+      Conformément au protocole secret du pacte germano-soviétique, l'URSS envahit l'est de
+      la Pologne ; le partage est confirmé le 28 septembre. Cela dépend de la solidité du
+      pacte et de la situation militaire polonaise.
+  - date: 1939-11-30
+    texte: >
+      L'URSS attaque la Finlande (guerre d'Hiver) après son refus de céder des territoires.
+  - date: 1940-04-09
+    texte: >
+      L'Allemagne envahit le Danemark et la Norvège pour sécuriser le minerai suédois et ses
+      routes navales.
+  - date: 1940-05-10
+    texte: >
+      Offensive allemande à l'Ouest : Pays-Bas, Belgique, Luxembourg puis France ; l'Italie
+      entre en guerre le 10 juin ; l'armistice franco-allemand est signé le 22 juin.
+  - date: 1940-06-15
+    texte: >
+      L'URSS occupe puis annexe l'Estonie, la Lettonie et la Lituanie, et prend la Bessarabie
+      à la Roumanie.
+  - date: 1940-09-27
+    texte: >
+      Pacte tripartite entre l'Allemagne, l'Italie et le Japon.
+  - date: 1941-06-22
+    texte: >
+      Opération Barbarossa : l'Allemagne et ses alliés envahissent l'URSS.
+  - date: 1941-12-07
+    texte: >
+      Le Japon attaque Pearl Harbor et les possessions européennes d'Asie du Sud-Est ; les
+      États-Unis entrent en guerre.
+  - texte: >
+      Ces dates sont celles de l'histoire réelle, données comme repères. Si les décisions des
+      joueurs changent la situation, les événements peuvent arriver plus tôt, plus tard,
+      autrement, ou pas du tout.
+
+conseil_nations: [france, royaume-uni, allemagne, urss, pologne, etats-unis, italie, japon]

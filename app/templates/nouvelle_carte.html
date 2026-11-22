@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titre %}{{ scenario.nom }} — pax{% endblock %}
+{% block contenu %}
+<div class="jeu">
+  <section class="zone-carte">
+    {{ svg|safe }}
+    <div class="outils-carte">
+      <button type="button" id="zoom-plus" title="Zoom avant">+</button>
+      <button type="button" id="zoom-moins" title="Zoom arrière">−</button>
+      <button type="button" id="zoom-tout" title="Voir le monde entier">⌂</button>
+    </div>
+    <div id="info-carte" class="info-carte">Survolez un pays, cliquez pour choisir sa nation.</div>
+  </section>
+  <aside class="panneau">
+    <h1>{{ scenario.nom }}</h1>
+    <p class="discret">Départ : {{ date_lisible }}</p>
+    <p>{{ scenario.description }}</p>
+    {% if scenario.conseil_nations %}
+    <p class="discret">Pour commencer :</p>
+    <p class="puces">
+      {% for nid in scenario.conseil_nations %}
+      <button type="button" class="puce" data-nid="{{ nid }}">{{ scenario.nations[nid].nom }}</button>
+      {% endfor %}
+    </p>
+    {% endif %}
+    <div id="fiche" class="fiche"><p class="discret">Aucune nation choisie.</p></div>
+    <form method="post" action="{{ u('/parties') }}" class="form-partie">
+      <input type="hidden" name="scenario" value="{{ scenario.id }}">
+      <input type="hidden" name="nation" id="champ-nation" value="">
+      <label for="objectif">Votre objectif (facultatif)</label>
+      <textarea id="objectif" name="objectif" rows="3" maxlength="{{ max_objectif }}"
+                placeholder="Par exemple : éviter la guerre et devenir la première puissance d'Europe."></textarea>
+      <button type="submit" id="commencer" class="btn principal" disabled>Commencer</button>
+    </form>
+  </aside>
+</div>
+<script type="application/json" id="pax-data">{{ data|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/carte.js') }}" defer></script>{% endblock %}

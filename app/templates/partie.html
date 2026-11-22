@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% from "_macros.html" import bouton_ia %}
+{% block titre %}{{ resume.nation.nom }} — {{ etat.scenario.nom }} — pax{% endblock %}
+{% block contenu %}
+<div class="jeu">
+  <section class="zone-carte">
+    {{ svg|safe }}
+    <div class="outils-carte">
+      <button type="button" id="zoom-plus" title="Zoom avant">+</button>
+      <button type="button" id="zoom-moins" title="Zoom arrière">−</button>
+      <button type="button" id="zoom-tout" title="Voir le monde entier">⌂</button>
+    </div>
+    <div id="info-carte" class="info-carte">Survolez un pays, cliquez pour voir sa nation.</div>
+  </section>
+  <aside class="panneau">
+    <div class="entete-partie">
+      <strong>{{ resume.nation.nom }}</strong> · {{ etat.scenario.nom }}<br>
+      <span class="date">{{ resume.date }}</span> <span class="discret">· tour {{ resume.tour }}</span>
+    </div>
+    <div class="onglets"><button type="button" class="actif">État</button></div>
+    <div class="etat">
+      <p>
+        {% if resume.nation.dirigeant %}<strong>{{ resume.nation.dirigeant }}</strong>{% endif %}
+        {% if resume.nation.regime %} — {{ resume.nation.regime }}{% endif %}
+      </p>
+      {% if resume.objectif %}<p class="objectif">Objectif : {{ resume.objectif }}</p>{% endif %}
+      <h3>Chiffres</h3>
+      <table class="chiffres">
+        {% for c in resume.chiffres %}
+        <tr>
+          <th>{{ c.libelle }}</th>
+          <td class="valeur">{{ c.valeur }}</td>
+          <td class="barre"><span style="width: {{ c.valeur }}%"></span></td>
+          <td class="ecart">{% if c.ecart %}{{ "%+d"|format(c.ecart) }}{% else %}={% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <p class="discret">L'écart compare au début de la partie.</p>
+      <h3>Relations</h3>
+      {% if resume.relations %}
+      {% for p in paliers if p in resume.relations %}
+      <p class="palier {{ p }}"><strong>{{ p|capitalize }}</strong> —
+        {% for r in resume.relations[p] %}{{ r.nom }} ({{ "%+d"|format(r.note) }}){% if not loop.last %}, {% endif %}{% endfor %}
+      </p>
+      {% endfor %}
+      {% else %}<p class="discret">Aucune relation connue.</p>{% endif %}
+      <h3>Guerres</h3>
+      {% if resume.guerres %}
+      {% for g in resume.guerres %}
+      <p><strong>{{ g.nom }}</strong> : {{ g.camp_a|join(", ") }} contre {{ g.camp_b|join(", ") }}
+        {% if g.depuis %}<span class="discret">(depuis le {{ g.depuis }})</span>{% endif %}</p>
+      {% endfor %}
+      {% else %}<p class="discret">Votre nation n'est en guerre contre personne.</p>{% endif %}
+      {% if resume.guerres_monde %}
+      <p class="discret">Dans le monde :
+        {% for g in resume.guerres_monde %}{{ g.nom }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      {% endif %}
+      <h3>Derniers événements</h3>
+      {% if resume.evenements %}
+      <ul class="evenements">
+        {% for e in resume.evenements %}<li><span class="discret">{{ e.date }}</span> {{ e.titre }}</li>{% endfor %}
+      </ul>
+      {% else %}<p class="discret">Aucun événement pour l'instant.</p>{% endif %}
+    </div>
+    <div class="avancer">
+      {{ bouton_ia("Avancer", id="avancer", bientot="étape 2 du jeu") }}
+    </div>
+  </aside>
+  <section id="fiche" class="fiche fiche-bas"><p class="discret">Cliquez sur un pays pour voir sa nation.</p></section>
+</div>
+<script type="application/json" id="pax-data">{{ data|tojson }}</script>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/carte.js') }}" defer></script>{% endblock %}

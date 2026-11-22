@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titre %}pax{% endblock %}</title>
+  <link rel="stylesheet" href="{{ u('/static/style.css') }}">
+</head>
+<body data-base="{{ prefixe }}">
+<header class="haut">
+  <a class="logo" href="{{ u('/') }}">pax</a>
+  <nav>
+    <a href="{{ u('/') }}">Mes parties</a>
+    <a href="{{ u('/nouvelle') }}">Nouvelle partie</a>
+    {% if admin %}<a href="{{ u('/reglages') }}">Réglages</a>{% endif %}
+  </nav>
+  <span id="ia-statut" class="badge" data-etat="inconnu">IA : vérification…</span>
+  {% if user %}<span class="utilisateur">{{ user }}</span>{% endif %}
+</header>
+<main>{% block contenu %}{% endblock %}</main>
+<footer>pax {{ version }}</footer>
+<script src="{{ u('/static/ia.js') }}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

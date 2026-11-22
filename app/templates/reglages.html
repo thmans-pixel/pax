@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block titre %}Réglages — pax{% endblock %}
+{% block contenu %}
+<section class="carte-texte">
+  <h1>Réglages de l'IA</h1>
+  {% if message %}<p class="ok">{{ message }}</p>{% endif %}
+  {% if faute %}<p class="alerte">{{ faute }}</p>{% endif %}
+  <form method="post" action="{{ u('/reglages') }}" id="form-reglages">
+    <label for="ollama_adresse">Adresse d'Ollama (le PC de l'IA)</label>
+    <input type="text" id="ollama_adresse" name="ollama_adresse" value="{{ reg.ollama_adresse }}" required
+           placeholder="http://192.168.1.20:11434">
+    <p><button type="button" class="btn" id="tester">Tester la connexion</button>
+       <span id="resultat-test" class="discret" role="status"></span></p>
+    <label for="modele">Modèle</label>
+    <select id="modele" name="modele" data-actuel="{{ reg.modele }}">
+      <option value="">— à choisir après le test —</option>
+      {% if reg.modele %}<option value="{{ reg.modele }}" selected>{{ reg.modele }}</option>{% endif %}
+    </select>
+    <label for="contexte">Taille de contexte (jetons)</label>
+    <input type="number" id="contexte" name="contexte" value="{{ reg.contexte }}" min="2048" max="131072" step="1024" required>
+    <p class="discret">16 384 convient à un modèle de 12 à 14 milliards de paramètres sur 16 Go de VRAM ;
+      plus grand, plus de mémoire.</p>
+    <p><button type="submit" class="btn principal">Enregistrer</button></p>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ u('/static/reglages.js') }}" defer></script>{% endblock %}

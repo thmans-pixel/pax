@@ -9,7 +9,10 @@ une marque).
 
 ## État
 
-Rien n'est codé. Le cahier des charges reste à écrire et à valider (`docs/specs/`).
+Étape 1 de la spec 001 faite : scénarios, carte, choix de la nation, parties enregistrées, Réglages.
+L'IA ne joue pas encore (étapes 2 à 4, voir `docs/specs/`).
+
+Essai local : `./lancer.sh` puis http://127.0.0.1:8800 — tests : `pip install -r requirements-dev.txt && python -m pytest tests`.
 
 ## Demande d'origine (22/11/2026)
 
@@ -24,3 +27,8 @@ Rien n'est codé. Le cahier des charges reste à écrire et à valider (`docs/sp
 Le projet libre [Open Historia](https://github.com/Open-Historia/open-historia) sert de
 référence pour les idées. Voir [docs/etude-open-historia.md](docs/etude-open-historia.md).
 Aucun code, aucun texte de consigne et aucun fichier de scénario n'en est copié.
+
+## Sécurité à connaître
+
+Le jeu fait confiance à l'en-tête `Remote-User` posé par YunoHost : **ne donnez jamais la permission
+du jeu au groupe « visiteurs »**, et ne l'exposez pas sans SSOwat. Il n'écoute que sur 127.0.0.1.

@@ -1,0 +1,4 @@
+{# Un bouton qui a besoin de l'IA : grisé tant que le PC de l'IA ne répond pas. #}
+{% macro bouton_ia(texte, id="", bientot="") %}
+<button type="button" class="btn btn-ia" {% if id %}id="{{ id }}"{% endif %} {% if bientot %}data-bientot="{{ bientot }}"{% endif %} disabled title="Vérification de l'IA…">{{ texte }}</button>
+{% endmacro %}
