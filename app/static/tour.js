@@ -54,8 +54,11 @@
     faute.hidden = !alerte; faute.textContent = alerte || '';
     progression.hidden = !texte; progression.textContent = texte || '';
   }
+  var premiere = true;
   function suivre() {
-    fetch(base + '/partie/' + pid + '/tour', { headers: { Accept: 'application/json' } })
+    var q = premiere ? '?initial=1' : '';
+    premiere = false;
+    fetch(base + '/partie/' + pid + '/tour' + q, { headers: { Accept: 'application/json' } })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.etat === 'aucun') { bloquer(false); dire(''); return; }
@@ -82,7 +85,7 @@
       body: JSON.stringify({ ordres: o, duree: duree })
     }).then(function (r) { return r.json().then(function (d) { return [r.status, d]; }); })
       .then(function (x) {
-        if (x[0] === 202) { suivre(); } else { bloquer(false); dire('', x[1].message); }
+        if (x[0] === 202) { premiere = false; suivre(); } else { bloquer(false); dire('', x[1].message); }
       })
       .catch(function () { bloquer(false); dire('', 'Le jeu ne répond pas.'); });
   });

@@ -68,6 +68,7 @@ def etat_initial(scenario: dict, nation_joueur: str, objectif: str = "") -> dict
         "guerres": [dict(g) for g in scenario["guerres"]],
         "journal": [],
         "corrections": [],
+        "corrections_joueur": [],
         "dernier_tour": None,
         "brouillon": None,
         "historique": [],

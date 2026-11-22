@@ -72,17 +72,17 @@ DELAI_SILENCE = 600.0   # 10 minutes sans RIEN recevoir (pas 10 minutes au total
 
 
 def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | None, num_ctx: int,
-              delai_silence: float = DELAI_SILENCE, sur_texte=None) -> str:
+              delai_silence: float = DELAI_SILENCE, sur_texte=None, max_jetons: int = 8192) -> str:
     """Une conversation en flux (POST /api/chat) ; renvoie le texte complet de la réponse.
 
     `format` = schéma JSON, `options.num_ctx` = taille de contexte. Le délai est celui d'UNE lecture
     sur la connexion : tant qu'Ollama envoie quelque chose, on attend ; après `delai_silence`
-    secondes sans rien recevoir, on abandonne. `sur_texte(texte_deja_recu)` est appelé à chaque
-    morceau (pour la progression). Bloquant : à lancer dans un fil.
+    secondes sans rien recevoir, on abandonne. `sur_texte(morceau)` est appelé à chaque morceau
+    reçu (pour la progression). `max_jetons` borne la longueur de la réponse (options.num_predict). Bloquant : à lancer dans un fil.
     """
     base = normaliser_adresse(adresse)
     corps = {"model": modele, "messages": messages, "stream": True,
-             "options": {"num_ctx": int(num_ctx), "temperature": 0.7}}
+             "options": {"num_ctx": int(num_ctx), "num_predict": int(max_jetons), "temperature": 0.7}}
     if schema is not None:
         corps["format"] = schema
     req = urllib.request.Request(
@@ -109,8 +109,8 @@ def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | No
                 morceau = (msg.get("content") or "") if isinstance(msg, dict) else ""
                 if morceau:
                     morceaux.append(morceau)
-                if sur_texte is not None:
-                    sur_texte("".join(morceaux))
+                    if sur_texte is not None:
+                        sur_texte(morceau)
                 if obj.get("done"):
                     break
     except urllib.error.HTTPError as e:

@@ -31,6 +31,7 @@ class Tour:
         self.message = ""
         self.mots = 0
         self.caracteres = 0
+        self._dans_un_mot = False
         self.relance = False
         self.debut = time.monotonic()
         self.debut_ecriture: float | None = None
@@ -40,9 +41,19 @@ class Tour:
     def actif(self) -> bool:
         return self.etat in ("attente", "ecriture")
 
-    def maj(self, texte: str):
-        self.caracteres = len(texte)
-        self.mots = len(texte.split())
+    def ajouter(self, morceau: str):
+        """Compte au fil de l'eau (sans recoller tout le texte à chaque morceau)."""
+        self.caracteres += len(morceau)
+        for c in morceau:
+            if c.isspace():
+                self._dans_un_mot = False
+            elif not self._dans_un_mot:
+                self._dans_un_mot = True
+                self.mots += 1
+
+    def remettre_a_zero(self):
+        self.mots = self.caracteres = 0
+        self._dans_un_mot = False
 
     def decrire(self, file: FileIA) -> dict:
         fin = self.fin if self.fin is not None else time.monotonic()
@@ -78,19 +89,30 @@ class Gestionnaire:
             self.tours[(user, pid)] = job
         fil = threading.Thread(target=self._executer, args=(app, user, pid, job), daemon=True,
                                name=f"tour-{pid}")
-        fil.start()
+        try:
+            fil.start()
+        except BaseException:                 # pas de fil : ne pas laisser un ticket bloquer la file
+            self.file.liberer(ticket)
+            with self.verrou:
+                self.tours.pop((user, pid), None)
+            raise
         return job
 
-    def consulter(self, user: str, pid: str) -> dict:
-        """État du tour pour la page. Un tour fini n'est rendu qu'une fois."""
+    GARDE_APRES_FIN = 300.0      # un tour fini reste consultable 5 minutes (un 2e onglet le verra)
+
+    def consulter(self, user: str, pid: str, initial: bool = False) -> dict:
+        """État du tour pour la page. `initial` : à l'ouverture de la page, un tour déjà fini n'est
+        pas rejoué (sinon la page se rechargerait sans fin)."""
         with self.verrou:
             j = self.tours.get((user, pid))
             if j is None:
                 return {"etat": "aucun"}
-            d = j.decrire(self.file)
-            if not j.actif:
+            if not j.actif and (time.monotonic() - (j.fin or 0) > self.GARDE_APRES_FIN):
                 del self.tours[(user, pid)]
-            return d
+                return {"etat": "aucun"}
+            if not j.actif and initial:
+                return {"etat": "aucun"}
+            return j.decrire(self.file)
 
     # ------------------------------------------------------------ le fil
     def _executer(self, app, user: str, pid: str, job: Tour):
@@ -125,7 +147,7 @@ class Gestionnaire:
             etat = app.state.sauvegarde.lire(user, pid)
         messages, _ = t.construire_requete(etat, app.state.carte.noms, job.ordres, job.duree, reg["contexte"])
         schema = t.schema_reponse()
-        texte = chat_flux(reg["ollama_adresse"], reg["modele"], messages, schema, reg["contexte"], delai, job.maj)
+        texte = chat_flux(reg["ollama_adresse"], reg["modele"], messages, schema, reg["contexte"], delai, job.ajouter)
         obj, fautes = t.lire_reponse(texte)
         if obj is not None:
             fautes = t.verifier_forme(obj)
@@ -136,8 +158,8 @@ class Gestionnaire:
                                 {"role": "user", "content": t.message_relance(fautes)}]
             if t.estimer_jetons(suite) > reg["contexte"] - t.RESERVE_REPONSE:
                 suite = messages + [{"role": "user", "content": t.message_relance(fautes)}]
-            job.maj("")
-            texte = chat_flux(reg["ollama_adresse"], reg["modele"], suite, schema, reg["contexte"], delai, job.maj)
+            job.remettre_a_zero()
+            texte = chat_flux(reg["ollama_adresse"], reg["modele"], suite, schema, reg["contexte"], delai, job.ajouter)
             obj, fautes = t.lire_reponse(texte)
             if obj is not None:
                 fautes = t.verifier_forme(obj)
@@ -158,10 +180,16 @@ class _Inexploitable(Exception):
     pass
 
 
+class TourEnCours(Exception):
+    pass
+
+
 def annuler(app, user: str, pid: str) -> dict:
     """Revient à l'état d'avant le dernier tour ; les ordres de ce tour reviennent dans la zone."""
     g: Gestionnaire = app.state.tours
     with g.verrou:
+        if g.actif(user, pid):
+            raise TourEnCours("Attendez la fin du tour avant d'annuler.")
         etat = app.state.sauvegarde.lire(user, pid)
         hist = etat.get("historique") or []
         if not hist:

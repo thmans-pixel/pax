@@ -74,6 +74,32 @@ def _entier(v):
     return None
 
 
+def _liste_textes(v) -> list[str]:
+    """Une liste de textes à partir de ce que dit l'IA (liste, texte seul, nombre) ; le reste est écarté."""
+    if isinstance(v, (str, int)) and not isinstance(v, bool):
+        v = [v]
+    if not isinstance(v, list):
+        return []
+    return [str(x).strip() for x in v if isinstance(x, (str, int)) and not isinstance(x, bool) and str(x).strip()]
+
+
+def _secret(v) -> bool:
+    """Secret par défaut : seul un « non » explicite (False, « false », « non », 0) rend l'événement public."""
+    if v is None or v is False:
+        return False
+    if isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v != 0
+    if isinstance(v, str):
+        return _norm(v) not in ("", "false", "faux", "non", "no", "0")
+    return True
+
+
+def _cite(v) -> str:
+    """Une valeur venue de l'IA, citée dans une correction : tronquée."""
+    t = " ".join(str(v).split())
+    return t if len(t) <= 80 else t[:79] + "…"
+
+
 def _borner(v: int, mini: int, maxi: int) -> int:
     return max(mini, min(maxi, v))
 
@@ -413,7 +439,8 @@ class Application:
         self.noms_terr = noms_terr
         self.duree = duree
         self.p = plafonds(duree)
-        self.corrections: list[str] = []
+        self.corrections: list[str] = []          # toutes : renvoyées à l'IA au tour suivant
+        self.corrections_joueur: list[str] = []   # celles que le joueur a le droit de lire
         self.index_nations: dict[str, str] = {}
         for nid, n in etat["nations"].items():
             self.index_nations[_norm(nid)] = nid
@@ -422,24 +449,30 @@ class Application:
         for t, nom in noms_terr.items():
             self.index_terr.setdefault(_norm(nom), t)
 
-    def corr(self, texte: str):
+    def corr(self, texte: str, prive: bool = False):
+        """`prive` : la correction révélerait quelque chose que le joueur ne doit pas savoir."""
         self.corrections.append(texte)
+        if not prive:
+            self.corrections_joueur.append(texte)
 
-    def nation(self, v, contexte: str, vivante: bool = False) -> str | None:
+    def implique_joueur(self, *nations) -> bool:
+        return self.etat["nation_joueur"] in nations
+
+    def nation(self, v, contexte: str, vivante: bool = False, prive: bool = False) -> str | None:
         nid = self.index_nations.get(_norm(v)) if isinstance(v, str) else None
         if nid is None:
-            self.corr(f"{contexte} : nation inconnue « {v} », ignorée.")
+            self.corr(f"{contexte} : nation inconnue « {_cite(v)} », ignorée.", prive)
         elif vivante and est_disparue(self.etat, nid):
-            self.corr(f"{contexte} : la nation « {self.etat['nations'][nid]['nom']} » n'a plus de territoire, ignorée.")
+            self.corr(f"{contexte} : la nation « {self.etat['nations'][nid]['nom']} » n'a plus de territoire, ignorée.", prive)
             return None
         return nid
 
-    def territoire(self, v, contexte: str) -> str | None:
+    def territoire(self, v, contexte: str, prive: bool = False) -> str | None:
         t = None
         if isinstance(v, str):
             t = self.index_terr.get(v.strip().casefold()) or self.index_terr.get(_norm(v))
         if t is None or t not in self.etat["territoires"]:
-            self.corr(f"{contexte} : territoire inconnu « {v} », ignoré.")
+            self.corr(f"{contexte} : territoire inconnu « {_cite(v)} », ignoré.", prive)
             return None
         return t
 
@@ -447,27 +480,35 @@ class Application:
     def evenements(self, bruts: list, debut: str, fin: str) -> list[dict]:
         res = []
         for ev in bruts:
-            pays = []
-            for v in ev.get("pays") or []:
-                nid = self.nation(v, f"Événement « {str(ev.get('titre', ''))[:40]} »")
-                if nid and nid not in pays:
+            pays, inconnus = [], []
+            for v in _liste_textes(ev.get("pays")):
+                nid = self.index_nations.get(_norm(v))
+                if nid is None:
+                    inconnus.append(v)
+                elif nid not in pays:
                     pays.append(nid)
+            secret = _secret(ev.get("secret"))
+            titre = " ".join(str(ev.get("titre") or "").split())[:160]
+            # un événement secret qui n'implique pas le joueur ne doit pas fuiter par une correction
+            prive = secret and not self.implique_joueur(*pays)
+            for v in inconnus:
+                self.corr(f"Événement « {_cite(titre)[:40]} » : nation inconnue « {_cite(v)} », ignorée.", prive)
             d = ev.get("date")
             try:
                 d = date.fromisoformat(str(d).strip()[:10]).isoformat()
             except ValueError:
                 d = fin
             d = max(debut, min(fin, d))
-            titre = " ".join(str(ev.get("titre") or "").split())[:160]
             if not titre:
                 continue
             res.append({"tour": self.etat["tour"] + 1, "date": d, "titre": titre,
-                        "texte": str(ev.get("texte") or "").strip()[:1500], "pays": pays,
-                        "secret": ev.get("secret") is True})
+                        "texte": str(ev.get("texte") or "").strip()[:1500], "pays": pays, "secret": secret})
         res.sort(key=lambda e: e["date"])
         return res
 
     def chiffres(self, bruts: list):
+        """Les variations d'une même nation et d'un même chiffre sont CUMULÉES, puis le cumul est borné."""
+        cumul: dict[tuple[str, str], int] = {}
         for c in bruts:
             nid = self.nation(c.get("nation"), "Variation de chiffre", vivante=True)
             cle = next((k for k in CHIFFRES if _norm(c.get("chiffre")) == _norm(k)
@@ -478,14 +519,18 @@ class Application:
             if cle is None or v is None:
                 self.corr(f"Variation de chiffre de {self.etat['nations'][nid]['nom']} : chiffre ou valeur illisible, ignorée.")
                 continue
+            cumul[(nid, cle)] = cumul.get((nid, cle), 0) + v
+        for (nid, cle), v in cumul.items():
             borne = _borner(v, -self.p["chiffre"], self.p["chiffre"])
             if borne != v:
-                self.corr(f"{LIBELLES_CHIFFRES[cle]} de {self.etat['nations'][nid]['nom']} : {v:+d} ramené à "
+                self.corr(f"{LIBELLES_CHIFFRES[cle]} de {self.etat['nations'][nid]['nom']} : {v:+d} au total ramené à "
                           f"{borne:+d} (plafond de ±{self.p['chiffre']} pour ce tour).")
             n = self.etat["nations"][nid]
             n[cle] = _borner(n[cle] + borne, 0, 100)
 
     def relations(self, bruts: list):
+        """Même principe : cumul par paire de nations, puis plafond."""
+        cumul: dict[str, int] = {}
         for r in bruts:
             a = self.nation(r.get("nation_a"), "Variation de relation", vivante=True)
             b = self.nation(r.get("nation_b"), "Variation de relation", vivante=True)
@@ -494,12 +539,17 @@ class Application:
                 continue
             nom = f"{self.etat['nations'][a]['nom']} / {self.etat['nations'][b]['nom']}"
             if a == b or v is None:
-                self.corr(f"Relation {nom} : demande illisible, ignorée.")
+                self.corr(f"Relation {nom} : demande illisible, ignorée.", not self.implique_joueur(a, b))
                 continue
+            cle = cle_relation(a, b)
+            cumul[cle] = cumul.get(cle, 0) + v
+        for cle, v in cumul.items():
+            a, b = cle.split("|")
+            nom = f"{self.etat['nations'][a]['nom']} / {self.etat['nations'][b]['nom']}"
             borne = _borner(v, -self.p["relation"], self.p["relation"])
             if borne != v:
-                self.corr(f"Relation {nom} : {v:+d} ramené à {borne:+d} (plafond de ±{self.p['relation']} pour ce tour).")
-            cle = cle_relation(a, b)
+                self.corr(f"Relation {nom} : {v:+d} au total ramené à {borne:+d} (plafond de ±{self.p['relation']} pour ce tour).",
+                          not self.implique_joueur(a, b))
             self.etat["relations"][cle] = _borner(self.etat["relations"].get(cle, 0) + borne, -100, 100)
 
     def declarations(self, bruts: list, debut: str):
@@ -508,7 +558,7 @@ class Application:
                 camps = []
                 for cle in ("camp_a", "camp_b"):
                     ids = []
-                    for v in g.get(cle) or []:
+                    for v in _liste_textes(g.get(cle)):
                         nid = self.nation(v, "Déclaration de guerre", vivante=True)
                         if nid and nid not in ids:
                             ids.append(nid)
@@ -516,7 +566,7 @@ class Application:
                 if not camps[0] or not camps[1] or set(camps[0]) & set(camps[1]):
                     self.corr("Déclaration de guerre : camps vides ou qui se recoupent, ignorée.")
                     continue
-                if en_guerre(self.etat, camps[0][0], camps[1][0]):
+                if all(en_guerre(self.etat, x, y) for x in camps[0] for y in camps[1]):
                     continue
                 nom = " ".join(str(g.get("nom") or "").split())[:100] or "Guerre"
                 self.etat["guerres"].append({"nom": nom, "camp_a": camps[0], "camp_b": camps[1], "depuis": debut})
@@ -526,8 +576,7 @@ class Application:
             if not _norm(g.get("action")).startswith("paix"):
                 continue
             nom = _norm(g.get("nom"))
-            ids = {self.index_nations.get(_norm(v)) for v in (g.get("camp_a") or []) + (g.get("camp_b") or [])
-                   if isinstance(v, str)} - {None}
+            ids = {self.index_nations.get(_norm(v)) for v in _liste_textes(g.get("camp_a")) + _liste_textes(g.get("camp_b"))} - {None}
             trouvee = None
             for w in self.etat["guerres"]:
                 if (nom and _norm(w["nom"]) == nom) or (ids and ids <= set(w["camp_a"]) | set(w["camp_b"])
@@ -535,12 +584,15 @@ class Application:
                     trouvee = w
                     break
             if trouvee is None:
-                self.corr(f"Paix « {g.get('nom') or '?'} » : aucune guerre correspondante, ignorée.")
+                self.corr(f"Paix « {_cite(g.get('nom') or '?')} » : aucune guerre correspondante, ignorée.")
             else:
                 self.etat["guerres"].remove(trouvee)
 
     def territoires(self, bruts: list, nouvelle: dict | None, evenements: list[dict]):
-        """Transferts, dans l'ordre donné, jusqu'au plafond. Chaque refus est une correction."""
+        """Transferts, dans l'ordre donné, jusqu'au plafond. Chaque refus est une correction.
+
+        Un refus entre deux nations dont aucune n'est celle du joueur reste caché au joueur (il pourrait
+        révéler un conflit ou un traité qu'il ne connaît pas)."""
         nouvelle_id = None
         if nouvelle is not None:
             nom = " ".join(str(nouvelle.get("nom") or "").split())[:80]
@@ -548,33 +600,36 @@ class Application:
                 self.corr("Nouvelle nation : nom manquant, ignorée.")
                 nouvelle = None
             else:
+                nouvelle = dict(nouvelle, nom=nom)
                 nouvelle_id = _slug(nom)
                 while nouvelle_id in self.etat["nations"]:
                     nouvelle_id += "-2"
         demandes = [dict(t) for t in bruts]
         if nouvelle is not None:
-            for v in nouvelle.get("territoires") or []:
+            for v in _liste_textes(nouvelle.get("territoires")):
                 demandes.append({"territoire": v, "vers": nouvelle_id, "base": "indépendance"})
         faits = 0
         cree = False
         for d in demandes:
-            nomt = self.noms_terr.get(str(d.get("territoire")), str(d.get("territoire")))
-            ctx = f"Transfert de « {nomt} »"
-            terr = self.territoire(d.get("territoire"), ctx)
+            brut_t = d.get("territoire")
+            nomt = self.noms_terr.get(brut_t, brut_t) if isinstance(brut_t, str) else brut_t
+            ctx = f"Transfert de « {_cite(nomt)} »"
+            terr = self.territoire(brut_t, ctx)
             if terr is None:
                 continue
             vers = d.get("vers")
-            if nouvelle_id and (vers == nouvelle_id or _norm(vers) == _norm(nouvelle.get("nom"))):
+            ancien = self.etat["territoires"][terr]
+            if nouvelle_id and (vers == nouvelle_id or _norm(vers) == _norm(nouvelle["nom"])):
                 dest = nouvelle_id
             else:
-                dest = self.nation(vers, ctx, vivante=True)
+                dest = self.nation(vers, ctx, vivante=True, prive=not self.implique_joueur(ancien))
                 if dest is None:
                     continue
-            ancien = self.etat["territoires"][terr]
             nom_ancien = self.etat["nations"][ancien]["nom"]
             nom_dest = nouvelle["nom"] if dest == nouvelle_id else self.etat["nations"][dest]["nom"]
+            prive = not self.implique_joueur(ancien, dest)
             if ancien == dest:
-                self.corr(f"{ctx} : appartient déjà à {nom_dest}, ignoré.")
+                self.corr(f"{ctx} : appartient déjà à {nom_dest}, ignoré.", prive)
                 continue
             base = _norm(d.get("base"))
             if base.startswith("guerre"):
@@ -590,10 +645,10 @@ class Application:
                 ok = False
                 pourquoi = "la base du transfert (guerre, traité, annexion, indépendance) est inconnue"
             if not ok:
-                self.corr(f"{ctx} vers {nom_dest} refusé : {pourquoi}.")
+                self.corr(f"{ctx} vers {nom_dest} refusé : {pourquoi}.", prive)
                 continue
             if faits >= self.p["transferts"]:
-                self.corr(f"{ctx} vers {nom_dest} refusé : plafond de {self.p['transferts']} transferts atteint pour ce tour.")
+                self.corr(f"{ctx} vers {nom_dest} refusé : plafond de {self.p['transferts']} transferts atteint pour ce tour.", prive)
                 continue
             if dest == nouvelle_id and not cree:
                 self._creer_nation(nouvelle_id, nouvelle)
@@ -601,7 +656,7 @@ class Application:
             self.etat["territoires"][terr] = dest
             faits += 1
         if nouvelle is not None and not cree:
-            self.corr(f"Nouvelle nation « {nouvelle.get('nom')} » : aucun territoire n'a pu lui être donné, non créée.")
+            self.corr(f"Nouvelle nation « {_cite(nouvelle.get('nom'))} » : aucun territoire n'a pu lui être donné, non créée.")
 
     def _creer_nation(self, nid: str, brut: dict):
         couleur = str(brut.get("couleur") or "")
@@ -644,7 +699,7 @@ def appliquer(etat: dict, reponse: dict, noms_terr: dict[str, str], ordres: list
         if o is None:
             a.corr(f"Ordre {i} : l'IA n'a donné aucune issue.")
         elif issue is None:
-            a.corr(f"Ordre {i} : issue « {o.get('issue')} » non reconnue.")
+            a.corr(f"Ordre {i} : issue « {_cite(o.get('issue'))} » non reconnue.")
         issues.append({"numero": i, "ordre": texte, "issue": issue,
                        "explication": str((o or {}).get("explication") or "").strip()[:800]})
     tour = etat["tour"] + 1
@@ -658,7 +713,8 @@ def appliquer(etat: dict, reponse: dict, noms_terr: dict[str, str], ordres: list
         f = " ".join(str(f).split())[:300]
         if f and f not in neuf["faits_etablis"]:
             neuf["faits_etablis"].append(f)
-    neuf["corrections"] = a.corrections[:40]
+    neuf["corrections"] = a.corrections[:40]                 # pour l'IA au tour suivant
+    neuf["corrections_joueur"] = a.corrections_joueur[:40]   # pour l'encart du joueur
     neuf["dernier_tour"] = {"tour": tour, "ordres": list(ordres), "duree": duree, "issues": issues}
     neuf["brouillon"] = None
     return neuf, a.corrections

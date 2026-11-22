@@ -484,3 +484,122 @@ def test_17_fin_de_partie(thibault, faux, app):
     assert thibault.post(f"/partie/{pid}/annuler", entetes=ORIG).status == 303
     page = thibault.get(f"/partie/{pid}").texte
     assert 'id="fin-partie"' not in page and 'id="avancer"' in page
+
+
+# ------------------------------------------------------------------ relecture : corrections
+def test_B1_plafond_non_contournable_par_repetition(etat39, noms):
+    rep = reponse(1,
+                  chiffres=[{"nation": "france", "chiffre": "economie", "variation": 5, "raison": "?"}] * 10,
+                  relations=[{"nation_a": "france", "nation_b": "italie", "variation": 20, "raison": "?"}] * 5)
+    neuf, corr = appliquer(etat39, noms, rep, "1mois")
+    assert neuf["nations"]["france"]["economie"] == etat39["nations"]["france"]["economie"] + 5
+    avant = etat39["relations"].get("france|italie", 0)
+    assert neuf["relations"]["france|italie"] == min(100, avant + 20)
+    assert any("au total ramené" in c and "Économie" in c for c in corr)
+    assert any("au total ramené" in c and "Relation" in c for c in corr)
+    # la paire est la même dans les deux sens
+    rep = reponse(1, relations=[{"nation_a": "france", "nation_b": "italie", "variation": 15, "raison": "?"},
+                                {"nation_a": "italie", "nation_b": "france", "variation": 15, "raison": "?"}])
+    neuf, _ = appliquer(etat39, noms, rep, "1mois")
+    assert neuf["relations"]["france|italie"] == min(100, avant + 20)
+
+
+def test_B2_corrections_du_joueur_sans_secret(thibault, faux, app):
+    pid = creer(thibault)
+    rep = reponse(
+        1,
+        evenements=[{"date": "1939-09-05", "titre": "Pacte des loups", "texte": "t", "pays": ["allemagne", "urss", "atlantide"],
+                     "secret": True},
+                    {"date": "1939-09-06", "titre": "Fête publique", "texte": "t", "pays": ["france", "lemuria"]}],
+        guerres=[{"action": "déclaration", "nom": "G", "camp_a": ["allemagne"], "camp_b": ["urss"]}],
+        territoires=[{"territoire": "UKR", "vers": "pologne", "base": "traité", "raison": "?"}],
+        relations=[{"nation_a": "allemagne", "nation_b": "urss", "variation": 90, "raison": "?"}])
+    jouer(thibault, pid, faux, rep)
+    e = sauvegarde(app, pid)
+    complet = " ".join(e["corrections"])
+    assert "Pacte des loups" in complet and "Allemagne" in complet          # l'IA reçoit tout
+    page = thibault.get(f"/partie/{pid}").texte
+    zone = page[page.index('id="corrections"'):]
+    zone = zone[:zone.index("</div>")]
+    assert "Pacte des loups" not in zone and "atlantide" not in zone       # événement secret des autres
+    assert "Allemagne" not in zone and "Union soviétique" not in zone and "Pologne" not in zone
+    assert "Fête publique" in zone and "lemuria" in zone                   # ce qui le concerne reste visible
+    jouer(thibault, pid, faux, reponse(1))
+    assert "Pacte des loups" in faux.requetes[-1]["messages"][-1]["content"]
+
+
+def test_I1_secret_par_defaut(etat39, noms):
+    for v in ("true", "oui", 1, "Vrai", "peut-être"):
+        rep = reponse(1, evenements=[{"titre": "E", "texte": "t", "pays": ["allemagne"], "secret": v}])
+        assert appliquer(etat39, noms, rep)[0]["journal"][0]["secret"] is True, v
+    for v in (False, "false", "non", 0, None):
+        rep = reponse(1, evenements=[{"titre": "E", "texte": "t", "pays": ["allemagne"], "secret": v}])
+        assert appliquer(etat39, noms, rep)[0]["journal"][0]["secret"] is False, v
+
+
+def test_I2_types_inattendus_ne_plantent_pas(etat39, noms):
+    rep = reponse(1,
+                  evenements=[{"titre": "E", "texte": "t", "pays": 5}, {"titre": "F", "texte": "t", "pays": "france"}],
+                  guerres=[{"action": "déclaration", "nom": "G", "camp_a": "france", "camp_b": 7},
+                           {"action": "paix", "nom": "x", "camp_a": 3, "camp_b": None}],
+                  nouvelle_nation={"nom": "Z", "territoires": "POL"},
+                  territoires=[{"territoire": 12, "vers": ["x"], "base": 3}])
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["journal"][1]["pays"] == ["france"]
+    assert neuf["territoires"]["POL"] == "z"            # texte seul accepté comme liste d'un élément
+
+
+def test_I3_supprimer_et_annuler_refuses_pendant_un_tour(thibault, faux, app):
+    faux.pause = 0.1
+    pid = creer(thibault)
+    jouer(thibault, pid, faux, reponse(1))
+    faux.programmer(reponse(1))
+    assert avancer(thibault, pid).status == 202
+    assert thibault.post(f"/partie/{pid}/supprimer", entetes=ORIG).status == 409
+    assert thibault.post(f"/partie/{pid}/annuler", entetes=ORIG).status == 409
+    assert attendre(thibault, pid)["etat"] == "termine"
+    assert sauvegarde(app, pid)["tour"] == 2                       # rien n'a été écrasé
+
+
+def test_D1_ticket_libere_si_le_fil_ne_demarre_pas(app, monkeypatch):
+    import threading
+    from app.execution import Gestionnaire
+    g = Gestionnaire()
+    monkeypatch.setattr(threading.Thread, "start", lambda self: (_ for _ in ()).throw(RuntimeError("non")))
+    with pytest.raises(RuntimeError):
+        g.lancer(app, "thibault", "0" * 16, ["x"], "1mois")
+    assert g.file.taille() == 0 and not g.actif("thibault", "0" * 16)
+
+
+def test_D2_num_predict_et_compteur_incremental(thibault, faux):
+    pid = creer(thibault)
+    jouer(thibault, pid, faux, reponse(1))
+    assert faux.requetes[0]["options"]["num_predict"] == 8192
+    from app.execution import Tour
+    j = Tour(None, [], "1mois")
+    for m in ("Bon", "jour le ", "mon", "de  ", "!"):
+        j.ajouter(m)
+    assert (j.mots, j.caracteres) == (4, 19)
+
+
+def test_D3_un_second_onglet_voit_le_tour_termine(thibault, faux):
+    pid = creer(thibault)
+    jouer(thibault, pid, faux, reponse(1))
+    assert thibault.get(f"/partie/{pid}/tour").json()["etat"] == "termine"
+    assert thibault.get(f"/partie/{pid}/tour").json()["etat"] == "termine"
+    assert thibault.get(f"/partie/{pid}/tour?initial=1").json()["etat"] == "aucun"   # pas de rechargement sans fin
+
+
+def test_D4_valeurs_de_l_ia_tronquees(etat39, noms):
+    rep = reponse(1, chiffres=[{"nation": "x" * 500, "chiffre": "armee", "variation": 1}])
+    _, corr = appliquer(etat39, noms, rep)
+    assert corr and len(corr[0]) < 200 and "…" in corr[0]
+
+
+def test_D5_declaration_de_guerre_tous_les_membres(etat39, noms):
+    # Allemagne/Pologne déjà en guerre ; la France contre l'Allemagne ET la Pologne est une guerre nouvelle
+    n = len(etat39["guerres"])
+    rep = reponse(1, guerres=[{"action": "déclaration", "nom": "Nouvelle", "camp_a": ["allemagne"], "camp_b": ["pologne"]}])
+    assert len(appliquer(etat39, noms, rep)[0]["guerres"]) == n
+    rep = reponse(1, guerres=[{"action": "déclaration", "nom": "Large", "camp_a": ["allemagne", "france"], "camp_b": ["pologne"]}])
+    assert len(appliquer(etat39, noms, rep)[0]["guerres"]) == n + 1

@@ -195,7 +195,7 @@ async def partie(request: Request):
                 journal=sorted(par_tour.items(), reverse=True), fin=moteur.partie_terminee(etat),
                 ordres_saisis=brouillon.get("ordres") or [""],
                 duree_choisie=brouillon.get("duree") or (etat.get("dernier_tour") or {}).get("duree") or moteur.DUREE_DEFAUT,
-                dernier=etat.get("dernier_tour"), corrections=etat.get("corrections") or [],
+                dernier=etat.get("dernier_tour"), corrections=etat.get("corrections_joueur") or [],
                 peut_annuler=bool(etat.get("historique")), max_ordres=moteur.MAX_ORDRES,
                 longueur_ordre=moteur.LONGUEUR_ORDRE)
 
@@ -206,7 +206,7 @@ async def lancer_tour(request: Request):
     app = request.app
     user, pid = request.state.user, request.path_params["pid"]
     try:
-        etat = app.state.sauvegarde.lire(user, pid)
+        app.state.sauvegarde.lire(user, pid)
     except PartieIntrouvable:
         return JSONResponse({"ok": False, "message": "Cette partie n'existe pas ou n'est pas à vous."}, status_code=404)
     try:
@@ -217,14 +217,18 @@ async def lancer_tour(request: Request):
             raise ValueError("Choisissez une durée.")
     except (ValueError, AttributeError) as e:
         return JSONResponse({"ok": False, "message": str(e) or "Demande mal formée."}, status_code=400)
-    if moteur.partie_terminee(etat):
-        return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
     if not app.state.reglages.lire()["modele"]:
         return JSONResponse({"ok": False, "message": "Aucun modèle n'est choisi dans les réglages."}, status_code=409)
     tours: execution.Gestionnaire = app.state.tours
     with tours.verrou:
         if tours.actif(user, pid):
             return JSONResponse({"ok": False, "message": "Un tour est déjà en cours pour cette partie."}, status_code=409)
+        try:
+            etat = app.state.sauvegarde.lire(user, pid)       # relu sous verrou : jamais d'écrasement d'un tour fini
+        except PartieIntrouvable:
+            return JSONResponse({"ok": False, "message": "Cette partie n'existe pas ou n'est pas à vous."}, status_code=404)
+        if moteur.partie_terminee(etat):
+            return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
         etat["brouillon"] = {"ordres": ordres, "duree": duree}      # les ordres survivent à un échec
         app.state.sauvegarde.enregistrer(user, etat)
         tours.lancer(app, user, pid, ordres, duree)
@@ -233,7 +237,8 @@ async def lancer_tour(request: Request):
 
 @protege()
 async def progression_tour(request: Request):
-    d = request.app.state.tours.consulter(request.state.user, request.path_params["pid"])
+    d = request.app.state.tours.consulter(request.state.user, request.path_params["pid"],
+                                          initial=request.query_params.get("initial") == "1")
     return JSONResponse(d, headers={"Cache-Control": "no-store"})
 
 
@@ -241,10 +246,10 @@ async def progression_tour(request: Request):
 async def annuler_tour(request: Request):
     app = request.app
     user, pid = request.state.user, request.path_params["pid"]
-    if app.state.tours.actif(user, pid):
-        return erreur(request, 409, "Un tour est en cours", "Attendez la fin du tour avant d'annuler.")
     try:
         execution.annuler(app, user, pid)
+    except execution.TourEnCours as e:
+        return erreur(request, 409, "Un tour est en cours", str(e))
     except PartieIntrouvable:
         return erreur(request, 404, "Partie introuvable", "Cette partie n'existe pas ou n'est pas à vous.")
     except ValueError as e:
@@ -254,10 +259,14 @@ async def annuler_tour(request: Request):
 
 @protege(ecriture=True)
 async def supprimer_partie(request: Request):
-    try:
-        request.app.state.sauvegarde.supprimer(request.state.user, request.path_params["pid"])
-    except PartieIntrouvable:
-        return erreur(request, 404, "Partie introuvable", "Cette partie n'existe pas ou n'est pas à vous.")
+    app, user, pid = request.app, request.state.user, request.path_params["pid"]
+    with app.state.tours.verrou:
+        if app.state.tours.actif(user, pid):
+            return erreur(request, 409, "Un tour est en cours", "Attendez la fin du tour avant de supprimer la partie.")
+        try:
+            app.state.sauvegarde.supprimer(user, pid)
+        except PartieIntrouvable:
+            return erreur(request, 404, "Partie introuvable", "Cette partie n'existe pas ou n'est pas à vous.")
     return RedirectResponse(f"{request.app.state.config.prefixe}/", status_code=303)
 
 

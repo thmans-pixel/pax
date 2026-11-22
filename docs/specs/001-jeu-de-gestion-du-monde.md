@@ -340,7 +340,7 @@ application bornée par les plafonds de la spec avec encart « Corrections » (r
 suivant), Journal, issue de chaque ordre, annulation (10 états dans la sauvegarde), écran de fin de
 partie, file d'attente unique (« en attente, N demande(s) avant vous »), progression du tour (mots reçus,
 temps écoulé), « Le PC de l'IA ne répond pas ». Critères cochés : 1 et 6 (vérifiés à la main sur thnas le
-22/11/2026) et 9 à 17 (dont 16 bis et 16 ter) ; 22 reste vrai (63 tests `pytest`, sans Ollama).
+22/11/2026) et 9 à 17 (dont 16 bis et 16 ter) ; 22 reste vrai (73 tests `pytest`, sans Ollama).
 
 **Choix de réalisation (écarts avec la spec)**
 - Le tour tourne dans un **fil d'exécution** (`threading`) et la page l'interroge chaque seconde
@@ -356,6 +356,11 @@ temps écoulé), « Le PC de l'IA ne répond pas ». Critères cochés : 1 et 6 
   « une ligne » sans lien avec le joueur ; si cela ne suffit pas, le tour n'est pas envoyé et le message
   demande d'augmenter la taille de contexte. Estimation : 1 jeton pour 3 caractères (prudent).
 - Avant chaque tour, une sonde de 5 s (`/api/tags`) : un PC éteint ne fait pas attendre 10 minutes.
+
+**Pour l'étape 3** : `histoire[].resume` et `faits_etablis` sont écrits par l'IA sans filtre de secret ;
+ils ne devront être donnés qu'au narrateur (ou stockés avec un niveau de secret) quand le conseiller, le
+rapport de situation et les dirigeants arriveront. Les corrections sont gardées en deux listes
+(`corrections` pour l'IA, `corrections_joueur` filtrée pour l'encart).
 
 **À vérifier à la main (non testable ici)**
 - **Choix du modèle par défaut** (fin de l'étape 2 dans la spec) : comparer 2 ou 3 modèles tenant dans
