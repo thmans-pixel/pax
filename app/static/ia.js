@@ -9,7 +9,7 @@
         b.title = 'Disponible à ' + b.dataset.bientot + '.';
         return;
       }
-      b.disabled = !pret;
+      b.disabled = !pret || b.dataset.occupe === '1';
       b.title = pret ? '' : message;
     });
   }

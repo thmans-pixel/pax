@@ -73,7 +73,7 @@ modèles installés, taille de contexte, bouton « Tester »).
 Chacun se vérifie par un test automatique ou par une manipulation précise.
 
 **Socle**
-1. [ ] Quand on installe l'appli sur thnas (`yunohost app install` depuis le dépôt), alors
+1. [x] Quand on installe l'appli sur thnas (`yunohost app install` depuis le dépôt), alors
    elle répond à son adresse YunoHost ; à l'installation, aucun compte n'y a accès sauf
    celui de Thibault, les autres s'ajoutent un par un ; un visiteur sans compte autorisé est
    renvoyé vers la connexion YunoHost ; `./lancer.sh` la démarre aussi en local sur `localhost:8800` pour le
@@ -90,7 +90,7 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
    — *Vérification :* test avec trois fichiers fautifs.
 5. [x] Quand on dépose un nouveau fichier YAML valide dans `scenarios/`, alors il apparaît
    au rechargement de la page, sans toucher au code. — *Vérification :* test.
-6. [ ] Sur la carte, chaque territoire a la couleur de sa nation ; au survol s'affichent le
+6. [x] Sur la carte, chaque territoire a la couleur de sa nation ; au survol s'affichent le
    territoire et sa nation ; un clic ouvre la fiche de la nation ; la molette zoome et le
    glisser déplace. — *Vérification :* manipulation dans Brave sur le PC.
 7. [x] Dans le scénario 1939 au départ, l'Autriche et la Tchéquie appartiennent à
@@ -104,43 +104,43 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
    mode développement local). — *Vérification :* test avec deux identifiants.
 
 **Le tour**
-9. [ ] Quand on écrit de 1 à 10 ordres, qu'on choisit une durée et qu'on clique « Avancer »,
+9. [x] Quand on écrit de 1 à 10 ordres, qu'on choisit une durée et qu'on clique « Avancer »,
    alors le jeu envoie **une seule** requête à Ollama et la date avance exactement de la
    durée choisie (1 semaine = 7 jours, 1 mois = même jour du mois suivant).
    — *Vérification :* test (le faux Ollama compte les requêtes).
-10. [ ] Pendant le tour, la progression est visible (texte reçu, temps écoulé) ; le jeu
+10. [x] Pendant le tour, la progression est visible (texte reçu, temps écoulé) ; le jeu
    n'abandonne pas tant qu'Ollama envoie quelque chose, et seulement après 10 minutes sans
    rien recevoir. — *Vérification :* test avec faux Ollama lent + manipulation.
-11. [ ] Quand la réponse est valide, alors les événements entrent dans le Journal, les
+11. [x] Quand la réponse est valide, alors les événements entrent dans le Journal, les
    chiffres, relations, guerres et territoires sont mis à jour, la carte est recolorée et
    chaque ordre affiche son issue (réussi, partiel, échec) avec une explication.
    — *Vérification :* test avec réponse enregistrée.
-12. [ ] Le code borne ce que l'IA propose : une variation de chiffre au-delà du plafond est
+12. [x] Le code borne ce que l'IA propose : une variation de chiffre au-delà du plafond est
    ramenée au plafond ; un transfert de territoire entre deux pays qui ne sont ni en guerre ni
    liés par un traité ou une annexion décrits dans le tour est refusé ; un pays ou territoire
    inconnu est ignoré. Chaque correction apparaît dans un encart « Corrections » et est
    signalée à l'IA au tour suivant. — *Vérification :* tests, un par règle.
-13. [ ] Quand la réponse est mal formée (texte autour du JSON, bloc `<think>`, virgule en
+13. [x] Quand la réponse est mal formée (texte autour du JSON, bloc `<think>`, virgule en
    trop), alors elle est réparée ; si elle reste fausse, le jeu relance **une fois** en
    listant les fautes ; si ça échoue encore, le tour n'est pas appliqué, l'état est inchangé
    et les ordres restent dans la zone de saisie. — *Vérification :* tests.
-14. [ ] Quand on clique « Annuler » (le dernier tour), alors l'état redevient exactement celui
+14. [x] Quand on clique « Annuler » (le dernier tour), alors l'état redevient exactement celui
    d'avant et les ordres de ce tour reviennent dans la zone ; on peut remonter jusqu'à 10 tours.
    — *Vérification :* test (comparaison du JSON).
-15. [ ] La requête d'un tour ne dépasse jamais la taille de contexte moins 4 096 jetons
+15. [x] La requête d'un tour ne dépasse jamais la taille de contexte moins 4 096 jetons
    réservés à la réponse ; pour tenir, on réduit d'abord les tours anciens à leur résumé puis
    on les retire, jamais les ordres, l'état du joueur ni les règles du scénario.
    — *Vérification :* test avec contexte réglé à 8 192 après 30 tours simulés.
-16. [ ] Un événement secret qui n'implique pas la nation du joueur n'apparaît ni dans son
+16. [x] Un événement secret qui n'implique pas la nation du joueur n'apparaît ni dans son
    Journal, ni dans ce qui est envoyé au conseiller ou aux dirigeants ; le narrateur du tour,
    lui, le voit. — *Vérification :* test sur le contenu des requêtes.
-16 bis. [ ] Quand deux joueurs demandent l'IA en même temps, alors les demandes passent l'une
+16 bis. [x] Quand deux joueurs demandent l'IA en même temps, alors les demandes passent l'une
    après l'autre et celui qui attend voit « en attente, 1 demande avant vous ».
    — *Vérification :* test avec deux demandes simultanées.
-16 ter. [ ] Quand le PC est éteint ou qu'Ollama n'y répond pas, alors « Avancer » et les aides
+16 ter. [x] Quand le PC est éteint ou qu'Ollama n'y répond pas, alors « Avancer » et les aides
    affichent « Le PC de l'IA ne répond pas » et rien n'est perdu.
    — *Vérification :* test avec faux Ollama éteint + essai réel PC éteint.
-17. [ ] Quand la nation du joueur n'a plus aucun territoire, alors un écran de fin de partie
+17. [x] Quand la nation du joueur n'a plus aucun territoire, alors un écran de fin de partie
    s'affiche, avec la possibilité d'annuler le dernier tour. — *Vérification :* test.
 
 **Les aides de l'IA**
@@ -330,3 +330,44 @@ l'environnement de réalisation). Sans conséquence pour l'usage.
 - les faits du scénario « Monde actuel » : voir la liste `ecarts` du fichier (dirigeants non revérifiés).
 
 Le bouton « Avancer » est volontairement désactivé jusqu'à l'étape 2.
+
+## Livraison — étape 2 (le tour)
+
+**Fait** : ordres (1 à 10) et durée (1 sem. / 1 mois / 3 mois / 6 mois / 1 an), requête unique vers
+Ollama (`/api/chat` en flux, `format` = schéma JSON, `num_ctx`, délai de 10 min **sans rien recevoir**),
+lecture tolérante (texte autour, `<think>`, virgule en trop) puis une seule relance listant les fautes,
+application bornée par les plafonds de la spec avec encart « Corrections » (renvoyé à l'IA au tour
+suivant), Journal, issue de chaque ordre, annulation (10 états dans la sauvegarde), écran de fin de
+partie, file d'attente unique (« en attente, N demande(s) avant vous »), progression du tour (mots reçus,
+temps écoulé), « Le PC de l'IA ne répond pas ». Critères cochés : 1 et 6 (vérifiés à la main sur thnas le
+22/11/2026) et 9 à 17 (dont 16 bis et 16 ter) ; 22 reste vrai (73 tests `pytest`, sans Ollama).
+
+**Choix de réalisation (écarts avec la spec)**
+- Le tour tourne dans un **fil d'exécution** (`threading`) et la page l'interroge chaque seconde
+  (`GET /partie/<id>/tour`) : plus simple et plus sûr derrière nginx qu'un flux SSE, et le tour continue
+  si l'on ferme l'onglet. La page n'affiche que des **compteurs** (mots, secondes), jamais le texte reçu :
+  il peut contenir des événements secrets.
+- Plafonds : « 1 semaine » suit la ligne « jusqu'à 1 mois » ; « 3 mois » suit « jusqu'à 6 mois ».
+- Transfert de territoire : « guerre » = les deux nations sont dans des camps opposés d'une guerre
+  (existante ou déclarée dans la même réponse) ; « traité » et « annexion » = un événement du même tour
+  cite les deux nations ; « indépendance » = vers la nouvelle nation du tour (une seule, créée seulement si
+  elle reçoit un territoire).
+- Si le contexte est trop petit, après avoir réduit l'histoire, on retire en dernier recours les nations
+  « une ligne » sans lien avec le joueur ; si cela ne suffit pas, le tour n'est pas envoyé et le message
+  demande d'augmenter la taille de contexte. Estimation : 1 jeton pour 3 caractères (prudent).
+- Avant chaque tour, une sonde de 5 s (`/api/tags`) : un PC éteint ne fait pas attendre 10 minutes.
+
+**Pour l'étape 3** : `histoire[].resume` et `faits_etablis` sont écrits par l'IA sans filtre de secret ;
+ils ne devront être donnés qu'au narrateur (ou stockés avec un niveau de secret) quand le conseiller, le
+rapport de situation et les dirigeants arriveront. Les corrections sont gardées en deux listes
+(`corrections` pour l'IA, `corrections_joueur` filtrée pour l'encart).
+
+**À vérifier à la main (non testable ici)**
+- **Choix du modèle par défaut** (fin de l'étape 2 dans la spec) : comparer 2 ou 3 modèles tenant dans
+  16 Go sur une même partie, avec le vrai Ollama, sur thnas. Aujourd'hui `qwen2.5:7b` est choisi.
+  Noter durées et qualité dans la PR.
+- Le JavaScript de la page de partie (onglets, ajout d'ordres, progression, bouton grisé) dans un vrai
+  navigateur, derrière nginx (`proxy_buffering off` est déjà dans `conf/nginx.conf`).
+- Un tour avec le vrai modèle : la qualité du JSON produit, le temps, la pertinence des corrections.
+- Essai réel PC éteint (critère 16 ter) : message « Le PC de l'IA ne répond pas ».
+- La mise à jour du paquet YunoHost en 0.2.0 (`yunohost app upgrade`), jamais exécutée ici.
