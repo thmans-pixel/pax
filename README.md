@@ -30,5 +30,5 @@ Aucun code, aucun texte de consigne et aucun fichier de scénario n'en est copi�
 
 ## Sécurité à connaître
 
-Le jeu fait confiance à l'en-tête `Remote-User` posé par YunoHost : **ne donnez jamais la permission
+Le jeu fait confiance à l'en-tête `Authorization` posé par SSOwat (YunoHost 12) : **ne donnez jamais la permission
 du jeu au groupe « visiteurs »**, et ne l'exposez pas sans SSOwat. Il n'écoute que sur 127.0.0.1.

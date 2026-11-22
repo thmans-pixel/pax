@@ -27,8 +27,13 @@ def test_moi(thibault, lea):
     assert lea.get("/moi").json() == {"utilisateur": "lea", "admin": False}
 
 
+def _basic(login):
+    import base64
+    return {"Authorization": "Basic " + base64.b64encode(f"{login}:-".encode()).decode()}
+
+
 def test_identifiant_invalide_refuse(app):
-    assert Client(app, {"Remote-User": "../etc"}).get("/").status == 401
+    assert Client(app, _basic("../etc")).get("/").status == 401
 
 
 def test_parcours_scenarios_et_carte(thibault):
@@ -152,14 +157,20 @@ def test_cartes_pas_d_injection_dans_objectif(thibault):
     assert "<script>alert(1)</script>" not in thibault.get(f"/partie/{pid}").texte
 
 
-def test_basic_auth_n_identifie_personne(app):
-    import base64
-    c = Client(app, {"Authorization": "Basic " + base64.b64encode(b"thibault:x").decode()})
-    assert c.get("/moi").status == 401
+def test_remote_user_ignore(app):
+    # SSOwat n'écrase pas Remote-User : un joueur ne doit pas pouvoir se faire passer pour un autre
+    assert Client(app, {"Remote-User": "thibault"}).get("/moi").status == 401
+    r = Client(app, {**_basic("lea"), "Remote-User": "thibault"}).get("/moi").json()
+    assert r == {"utilisateur": "lea", "admin": False}
+
+
+def test_authorization_mal_formee(app):
+    assert Client(app, {"Authorization": "Basic %%%"}).get("/moi").status == 401
+    assert Client(app, {"Authorization": "Bearer abc"}).get("/moi").status == 401
 
 
 def test_identifiants_point_refuses(app):
-    assert Client(app, {"Remote-User": ".."}).get("/").status == 401
+    assert Client(app, _basic("..")).get("/").status == 401
 
 
 def test_adresse_ollama_invalide(thibault):

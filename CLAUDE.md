@@ -5,7 +5,8 @@ Spec : `docs/specs/001-jeu-de-gestion-du-monde.md` (suivre ses étapes, une PR p
 
 ## Règles
 - L'IA raconte et propose ; **Python tient l'état** (chiffres plafonnés, validés). Jamais l'inverse.
-- Identité du joueur = en-tête `Remote-User` posé par YunoHost, jamais un champ de formulaire.
+- Identité du joueur = en-tête `Authorization: Basic identifiant:-` posé par SSOwat (YunoHost 12),
+  jamais un champ de formulaire. Ne PAS lire `Remote-User` : SSOwat ne l'écrase pas.
 - Aucun code ni texte copié d'Open Historia (AGPL / CC BY) : idées seulement.
 - Fond de carte : Natural Earth (domaine public), préparé par `outils/preparer_carte.py`.
 - Tests : `python -m pytest tests` (client ASGI maison `tests/client.py`, faux Ollama `tests/faux_ollama.py`).

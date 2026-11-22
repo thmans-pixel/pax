@@ -21,7 +21,8 @@ def app(config):
 
 
 def _client(app, user):
-    return Client(app, {"Remote-User": user})
+    import base64
+    return Client(app, {"Authorization": "Basic " + base64.b64encode(f"{user}:-".encode()).decode()})
 
 
 @pytest.fixture
