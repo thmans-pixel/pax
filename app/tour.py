@@ -83,6 +83,10 @@ def _liste_textes(v) -> list[str]:
     return [str(x).strip() for x in v if isinstance(x, (str, int)) and not isinstance(x, bool) and str(x).strip()]
 
 
+MOTS_SECRET = re.compile(r"\b(secr[eè]t(e|s|es)?|confidentiel(le)?s?|clandestin(e)?s?)\b", re.IGNORECASE)
+MENTION_SECRET = re.compile(r"\s*[\(\[]\s*(secret|confidentiel)\s*[\)\]]", re.IGNORECASE)
+
+
 def _secret(v) -> bool:
     """Secret par défaut : seul un « non » explicite (False, « false », « non », 0) rend l'événement public."""
     if v is None or v is False:
@@ -169,7 +173,10 @@ def schema_reponse() -> dict:
             "resume": texte,
             "faits": liste_ids,
         },
-        "required": ["evenements", "ordres", "resume"],
+        # Tout est obligatoire : avec la sortie contrainte d'Ollama, un modèle saute les clés
+        # facultatives et ne change alors jamais l'état du monde (constaté sur thnas).
+        "required": ["evenements", "ordres", "chiffres", "relations", "guerres", "territoires",
+                     "nouvelle_nation", "resume", "faits"],
     }
 
 
@@ -185,14 +192,22 @@ Règles à respecter :
 - Désigne les nations par leur identifiant (celui entre crochets) et les territoires par leur code.
 - Juge chaque ordre selon la situation réelle de la nation (chiffres, alliances, guerres) : \
 « réussi », « partiel » ou « échec », avec une explication. Donne une issue à CHAQUE ordre, par son numéro.
-- Reste réaliste : l'histoire peut dévier de la réalité à cause des ordres du joueur, mais sans miracle.
+- Reste réaliste : l'histoire peut dévier de la réalité à cause des ordres du joueur, mais sans miracle. \
+Seules les technologies de l'époque du scénario existent : un ordre qui demande une invention \
+impossible à cette date (arme nucléaire en 1939, ordinateurs modernes…) est un « échec ».
+- L'état du monde doit suivre le récit. Chaque événement important a ses conséquences chiffrées : \
+une guerre déclarée apparaît dans « guerres » (action « déclaration »), une conquête dans \
+« territoires », un rapprochement ou une crise dans « relations », un effort ou une perte dans \
+« chiffres ». Un ordre « réussi » ou « partiel » change au moins un chiffre ou une relation. \
+Ne laisse ces listes vides que s'il ne s'est vraiment rien passé.
+- Ne raconte pas de nouveau un événement des tours précédents (il est déjà dans l'histoire).
 - Les variations de chiffres et de relations doivent rester modestes et respecter les plafonds donnés.
 - Un territoire ne change de mains que par une guerre en cours (« guerre »), un traité ou une \
 annexion décrits dans un événement du même tour (« traité », « annexion »), ou une indépendance \
 (« indépendance », avec « nouvelle_nation », une seule par tour). Les événements qui impliquent \
 deux nations doivent citer les deux dans « pays ».
-- Un événement « secret » n'est connu que de ceux qui y participent ; mets les nations concernées \
-dans « pays ».
+- Un événement « secret » n'est connu que de ceux qui y participent : mets « secret » à true et les \
+nations concernées dans « pays ». N'écris jamais « secret » ni « confidentiel » dans le titre ou le texte.
 - Les événements ont une date comprise entre le début et la fin du tour (AAAA-MM-JJ).
 - « resume » : un paragraphe qui résume tout le tour. « faits » : les faits nouveaux et durables \
 à retenir (une phrase chacun).
@@ -326,7 +341,7 @@ def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: 
         for h in recents:
             lignes.append(f"- Tour {h['tour']} ({date_fr(h['du'])} → {date_fr(h['au'])}) : {h['resume']}")
             for ev in [e for e in etat["journal"] if e.get("tour") == h["tour"]]:
-                lignes.append(f"    · {ev['titre']}{' (secret)' if ev.get('secret') else ''}")
+                lignes.append(f"    · {ev['titre']}" + (f" [connu seulement de : {', '.join(ev.get('pays') or [])}]" if ev.get('secret') else ''))
         section("Histoire récente (du plus ancien au plus récent)", lignes)
     if etat.get("objectif"):
         section("Objectif permanent du joueur", [etat["objectif"]])
@@ -487,8 +502,11 @@ class Application:
                     inconnus.append(v)
                 elif nid not in pays:
                     pays.append(nid)
-            secret = _secret(ev.get("secret"))
             titre = " ".join(str(ev.get("titre") or "").split())[:160]
+            texte = str(ev.get("texte") or "").strip()[:1500]
+            # Prudence : un modèle écrit parfois « (secret) » dans le titre en laissant secret à false.
+            secret = _secret(ev.get("secret")) or bool(MOTS_SECRET.search(titre + " " + texte))
+            titre = MENTION_SECRET.sub("", titre).strip() or titre
             # un événement secret qui n'implique pas le joueur ne doit pas fuiter par une correction
             prive = secret and not self.implique_joueur(*pays)
             for v in inconnus:
@@ -502,7 +520,7 @@ class Application:
             if not titre:
                 continue
             res.append({"tour": self.etat["tour"] + 1, "date": d, "titre": titre,
-                        "texte": str(ev.get("texte") or "").strip()[:1500], "pays": pays, "secret": secret})
+                        "texte": texte, "pays": pays, "secret": secret})
         res.sort(key=lambda e: e["date"])
         return res
 

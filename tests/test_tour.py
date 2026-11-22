@@ -378,7 +378,10 @@ def test_15_contexte_8192_apres_30_tours(etat39, noms):
     assert "1. Ordre capital numéro un" in texte and "2. Ordre capital numéro deux" in texte   # ordres
     assert "Daladier" in texte                                           # état du joueur
     assert "Règles de simulation" in texte and "Pologne" in texte        # règles et contexte du scénario
-    assert "Résumé du tour 30." in texte and "Résumé du tour 1." not in texte   # les plus anciens partent d'abord
+    assert "Résumé du tour 1." not in texte
+    moyen, _ = moteur.construire_requete(e, noms, ordres, "1mois", 10240)
+    tm = moyen[-1]["content"]
+    assert "Résumé du tour 30." in tm and "Résumé du tour 1." not in tm   # les plus anciens partent d'abord
     with pytest.raises(moteur.ContexteTropPetit):
         moteur.construire_requete(e, noms, ordres, "1mois", 4200)
 
@@ -603,3 +606,21 @@ def test_D5_declaration_de_guerre_tous_les_membres(etat39, noms):
     assert len(appliquer(etat39, noms, rep)[0]["guerres"]) == n
     rep = reponse(1, guerres=[{"action": "déclaration", "nom": "Large", "camp_a": ["allemagne", "france"], "camp_b": ["pologne"]}])
     assert len(appliquer(etat39, noms, rep)[0]["guerres"]) == n + 1
+
+
+
+def test_schema_tout_obligatoire():
+    # sans cela, la sortie contrainte d'Ollama saute chiffres/relations/guerres (constaté sur thnas)
+    req = moteur.schema_reponse()["required"]
+    for cle in ("chiffres", "relations", "guerres", "territoires", "nouvelle_nation", "faits"):
+        assert cle in req
+
+
+def test_mention_secret_dans_le_titre_rend_secret(etat39, noms):
+    rep = reponse(1, evenements=[
+        {"titre": "Combats de Khalkhin Gol (secret)", "texte": "t", "pays": ["urss", "japon"], "secret": False},
+        {"titre": "Pacte", "texte": "Cette information est confidentielle.", "pays": ["urss"], "secret": False},
+        {"titre": "Mobilisation", "texte": "Les alliés mobilisent.", "pays": ["france"], "secret": False}])
+    j = {e["titre"]: e for e in appliquer(etat39, noms, rep)[0]["journal"]}
+    assert j["Combats de Khalkhin Gol"]["secret"] is True          # mention retirée du titre
+    assert j["Pacte"]["secret"] is True and j["Mobilisation"]["secret"] is False
