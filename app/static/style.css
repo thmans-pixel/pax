@@ -90,3 +90,27 @@ label { display: block; margin: 1rem 0 .25rem; font-weight: 600; }
   .panneau { grid-row: 2; border-left: 0; border-top: 1px solid var(--bord); }
   .fiche-bas { grid-row: 3; }
 }
+
+/* étape 2 : le tour */
+.volet[hidden] { display: none; }
+.volet ol { padding-left: 0; list-style: none; counter-reset: ordre; margin: 0 0 .5rem; }
+.volet ol li { counter-increment: ordre; position: relative; padding-left: 1.6rem; margin: .35rem 0; }
+.volet ol li::before { content: counter(ordre) "."; position: absolute; left: 0; top: .4rem; color: var(--discret); }
+.volet textarea { resize: vertical; }
+.puce.choisie { background: var(--accent); border-color: var(--accent); color: #1b1405; font-weight: 600; }
+.issues { list-style: none; padding: 0; margin: 0; }
+.issues li { margin: .4rem 0; padding: .4rem .6rem; border-left: 3px solid var(--bord); background: #101c29; border-radius: 4px; }
+.issue-ok { border-left-color: var(--ok) !important; }
+.issue-part { border-left-color: var(--accent) !important; }
+.issue-ko { border-left-color: var(--alerte) !important; }
+.etiquette { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--discret); }
+.corrections { margin: .8rem 0; padding: .5rem .8rem; border: 1px solid var(--accent); border-radius: 8px; background: #1d1a10; }
+.corrections h3 { margin-top: 0; }
+.corrections ul { padding-left: 1.1rem; margin: .3rem 0 0; }
+.evenement { margin: .4rem 0; padding: .4rem .6rem; background: #101c29; border-radius: 6px; }
+.evenement p { margin: .3rem 0 0; }
+.evenement.secret { border-left: 3px solid var(--accent); }
+.progression { margin: 0 0 .5rem; padding: .4rem .6rem; border-radius: 6px; background: #1b2c3e; font-variant-numeric: tabular-nums; }
+.avancer .annuler { margin: .5rem 0 0; }
+.fin-partie { margin: .8rem 0; padding: .8rem 1rem; border: 1px solid var(--alerte); border-radius: 8px; background: #2a1414; }
+.fin-partie h2 { margin: 0 0 .4rem; color: var(--alerte); }

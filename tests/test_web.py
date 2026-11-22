@@ -145,10 +145,10 @@ def test_scenario_fautif_signale(thibault, config):
     assert r.status == 200 and "faux.yaml" in r.texte and "Monde actuel" in r.texte
 
 
-def test_bouton_avancer_desactive_et_etat_sans_ia(thibault):
+def test_bouton_avancer_desactive_au_rendu_et_etat_sans_ia(thibault):
     pid = creer(thibault, scenario="monde-actuel", nation="france")
     t = thibault.get(f"/partie/{pid}").texte
-    assert "data-bientot" in t
+    assert 'id="avancer"' in t and "data-bientot" not in t and "disabled" in t
     assert "22 novembre 2026" in t
 
 

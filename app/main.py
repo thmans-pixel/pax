@@ -24,7 +24,8 @@ from starlette.templating import Jinja2Templates
 from . import __version__
 from .carte import Carte
 from .config import Config
-from .monde import etat_initial, fiche_nation, resume_etat, date_fr, PALIERS, LIBELLES_CHIFFRES
+from . import execution, tour as moteur
+from .monde import etat_initial, evenements_visibles, fiche_nation, resume_etat, date_fr, PALIERS, LIBELLES_CHIFFRES
 from .ollama import OllamaIndisponible, lister_modeles, normaliser_adresse
 from .reglages import Reglages
 from .sauvegarde import PartieIntrouvable, Sauvegarde, UTILISATEUR
@@ -183,9 +184,72 @@ async def partie(request: Request):
     except PartieIntrouvable:
         return erreur(request, 404, "Partie introuvable", "Cette partie n'existe pas ou n'est pas à vous.")
     carte: Carte = request.app.state.carte
+    visibles = evenements_visibles(etat)
+    par_tour: dict[int, list[dict]] = {}
+    for e in reversed(visibles):
+        par_tour.setdefault(e["tour"], []).append({**e, "date_lisible": date_fr(e["date"])})
+    brouillon = etat.get("brouillon") or {}
     return page(request, "partie.html", etat=etat, resume=resume_etat(etat, carte.noms),
                 svg=carte.svg(etat["territoires"], etat["nations"]), data=donnees_carte(carte, etat),
-                paliers=PALIERS, libelles=LIBELLES_CHIFFRES)
+                paliers=PALIERS, libelles=LIBELLES_CHIFFRES, durees=moteur.DUREES,
+                journal=sorted(par_tour.items(), reverse=True), fin=moteur.partie_terminee(etat),
+                ordres_saisis=brouillon.get("ordres") or [""],
+                duree_choisie=brouillon.get("duree") or (etat.get("dernier_tour") or {}).get("duree") or moteur.DUREE_DEFAUT,
+                dernier=etat.get("dernier_tour"), corrections=etat.get("corrections") or [],
+                peut_annuler=bool(etat.get("historique")), max_ordres=moteur.MAX_ORDRES,
+                longueur_ordre=moteur.LONGUEUR_ORDRE)
+
+
+@protege(ecriture=True)
+async def lancer_tour(request: Request):
+    """Démarre un tour en arrière-plan ; la page suit sa progression avec GET /partie/<id>/tour."""
+    app = request.app
+    user, pid = request.state.user, request.path_params["pid"]
+    try:
+        etat = app.state.sauvegarde.lire(user, pid)
+    except PartieIntrouvable:
+        return JSONResponse({"ok": False, "message": "Cette partie n'existe pas ou n'est pas à vous."}, status_code=404)
+    try:
+        donnees = await request.json()
+        ordres = moteur.nettoyer_ordres(donnees.get("ordres"))
+        duree = donnees.get("duree")
+        if duree not in moteur.DUREES:
+            raise ValueError("Choisissez une durée.")
+    except (ValueError, AttributeError) as e:
+        return JSONResponse({"ok": False, "message": str(e) or "Demande mal formée."}, status_code=400)
+    if moteur.partie_terminee(etat):
+        return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
+    if not app.state.reglages.lire()["modele"]:
+        return JSONResponse({"ok": False, "message": "Aucun modèle n'est choisi dans les réglages."}, status_code=409)
+    tours: execution.Gestionnaire = app.state.tours
+    with tours.verrou:
+        if tours.actif(user, pid):
+            return JSONResponse({"ok": False, "message": "Un tour est déjà en cours pour cette partie."}, status_code=409)
+        etat["brouillon"] = {"ordres": ordres, "duree": duree}      # les ordres survivent à un échec
+        app.state.sauvegarde.enregistrer(user, etat)
+        tours.lancer(app, user, pid, ordres, duree)
+    return JSONResponse({"ok": True}, status_code=202)
+
+
+@protege()
+async def progression_tour(request: Request):
+    d = request.app.state.tours.consulter(request.state.user, request.path_params["pid"])
+    return JSONResponse(d, headers={"Cache-Control": "no-store"})
+
+
+@protege(ecriture=True)
+async def annuler_tour(request: Request):
+    app = request.app
+    user, pid = request.state.user, request.path_params["pid"]
+    if app.state.tours.actif(user, pid):
+        return erreur(request, 409, "Un tour est en cours", "Attendez la fin du tour avant d'annuler.")
+    try:
+        execution.annuler(app, user, pid)
+    except PartieIntrouvable:
+        return erreur(request, 404, "Partie introuvable", "Cette partie n'existe pas ou n'est pas à vous.")
+    except ValueError as e:
+        return erreur(request, 400, "Rien à annuler", str(e))
+    return RedirectResponse(f"{app.state.config.prefixe}/partie/{pid}", status_code=303)
 
 
 @protege(ecriture=True)
@@ -281,6 +345,9 @@ def creer_app(config: Config | None = None) -> Starlette:
         Route("/nouvelle/{sid}", nouvelle_carte),
         Route("/parties", creer_partie, methods=["POST"]),
         Route("/partie/{pid}", partie),
+        Route("/partie/{pid}/tour", lancer_tour, methods=["POST"]),
+        Route("/partie/{pid}/tour", progression_tour),
+        Route("/partie/{pid}/annuler", annuler_tour, methods=["POST"]),
         Route("/partie/{pid}/supprimer", supprimer_partie, methods=["POST"]),
         Route("/reglages", reglages_page),
         Route("/reglages", reglages_enregistrer, methods=["POST"]),
@@ -299,4 +366,5 @@ def creer_app(config: Config | None = None) -> Starlette:
     app.state.sauvegarde = Sauvegarde(config.data)
     app.state.reglages = Reglages(config.data / "reglages.json", config.ollama_defaut)
     app.state.cache_statut = {}
+    app.state.tours = execution.Gestionnaire()
     return app

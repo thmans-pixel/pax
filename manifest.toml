@@ -5,7 +5,7 @@ name = "Pax"
 description.en = "Turn-based world management game driven by Ollama (Pax Historia-style)"
 description.fr = "Jeu de gestion du monde au tour par tour, propulsé par Ollama (façon Pax Historia)"
 
-version = "0.1.0~ynh4"
+version = "0.2.0~ynh1"
 
 maintainers = ["thmans-pixel"]
 

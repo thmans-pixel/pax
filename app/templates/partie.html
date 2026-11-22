@@ -17,8 +17,75 @@
       <strong>{{ resume.nation.nom }}</strong> · {{ etat.scenario.nom }}<br>
       <span class="date">{{ resume.date }}</span> <span class="discret">· tour {{ resume.tour }}</span>
     </div>
-    <div class="onglets"><button type="button" class="actif">État</button></div>
-    <div class="etat">
+    <div class="onglets" role="tablist">
+      <button type="button" data-onglet="ordres" class="actif">Ordres</button>
+      <button type="button" data-onglet="journal">Journal</button>
+      <button type="button" data-onglet="etat">État</button>
+    </div>
+    {% if fin %}
+    <div class="fin-partie" id="fin-partie">
+      <h2>Fin de la partie</h2>
+      <p>{{ resume.nation.nom }} n'a plus aucun territoire : la nation a disparu de la carte.</p>
+      {% if peut_annuler %}
+      <form method="post" action="{{ u('/partie/' ~ etat.id ~ '/annuler') }}">
+        <button class="btn" type="submit">↶ Annuler le dernier tour</button>
+      </form>
+      {% endif %}
+      <p><a class="btn principal" href="{{ u('/nouvelle') }}">Nouvelle partie</a>
+         <a class="btn" href="{{ u('/') }}">Mes parties</a></p>
+    </div>
+    {% endif %}
+    <div class="volet" data-volet="ordres">
+      {% if dernier %}
+      <h3>Issue du dernier tour</h3>
+      <ul class="issues">
+        {% for i in dernier.issues %}
+        <li class="issue-{{ {'réussi': 'ok', 'partiel': 'part', 'échec': 'ko'}.get(i.issue, 'inc') }}">
+          <strong>{{ i.numero }}. {{ i.ordre }}</strong><br>
+          <span class="etiquette">{{ i.issue or 'issue non précisée' }}</span>
+          {% if i.explication %} — {{ i.explication }}{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if corrections %}
+      <div class="corrections" id="corrections">
+        <h3>Corrections</h3>
+        <p class="discret">Ce que le jeu a refusé ou ramené à la limite au dernier tour (l'IA en est informée au tour suivant).</p>
+        <ul>{% for c in corrections %}<li>{{ c }}</li>{% endfor %}</ul>
+      </div>
+      {% endif %}
+      {% if not fin %}
+      <h3>Vos ordres</h3>
+      <ol id="liste-ordres" data-max="{{ max_ordres }}" data-longueur="{{ longueur_ordre }}">
+        {% for o in ordres_saisis %}
+        <li><textarea rows="2" maxlength="{{ longueur_ordre }}" placeholder="Écrivez un ordre…">{{ o }}</textarea></li>
+        {% endfor %}
+      </ol>
+      <button type="button" class="btn" id="ajouter-ordre">+ ajouter un ordre</button>
+      <h3>Avancer de</h3>
+      <div class="puces" id="durees">
+        {% for cle, d in durees.items() %}
+        <button type="button" class="puce{% if cle == duree_choisie %} choisie{% endif %}" data-duree="{{ cle }}">{{ d.libelle }}</button>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="volet" data-volet="journal" hidden>
+      {% if journal %}
+      {% for tour, evenements in journal %}
+      <h3>Tour {{ tour }}</h3>
+      {% for e in evenements %}
+      <article class="evenement{% if e.secret %} secret{% endif %}">
+        <strong>{{ e.titre }}</strong>{% if e.secret %} <span class="etiquette">secret</span>{% endif %}<br>
+        <span class="discret">{{ e.date_lisible }}</span>
+        <p>{{ e.texte }}</p>
+      </article>
+      {% endfor %}
+      {% endfor %}
+      {% else %}<p class="discret">Le journal est vide : il se remplit à chaque tour.</p>{% endif %}
+    </div>
+    <div class="etat volet" data-volet="etat" hidden>
       <p>
         {% if resume.nation.dirigeant %}<strong>{{ resume.nation.dirigeant }}</strong>{% endif %}
         {% if resume.nation.regime %} — {{ resume.nation.regime }}{% endif %}
@@ -62,12 +129,22 @@
       </ul>
       {% else %}<p class="discret">Aucun événement pour l'instant.</p>{% endif %}
     </div>
-    <div class="avancer">
-      {{ bouton_ia("Avancer", id="avancer", bientot="étape 2 du jeu") }}
+    {% if not fin %}
+    <div class="avancer" id="zone-avancer" data-partie="{{ etat.id }}" data-date="{{ resume.date }}">
+      <p id="progression" class="progression" hidden aria-live="polite"></p>
+      <p id="faute-tour" class="alerte" hidden></p>
+      {{ bouton_ia("Avancer", id="avancer") }}
+      {% if peut_annuler %}
+      <form method="post" action="{{ u('/partie/' ~ etat.id ~ '/annuler') }}" class="annuler">
+        <button class="btn" type="submit" id="annuler" title="Revenir avant le dernier tour">↶ Annuler le dernier tour</button>
+      </form>
+      {% endif %}
     </div>
+    {% endif %}
   </aside>
   <section id="fiche" class="fiche fiche-bas"><p class="discret">Cliquez sur un pays pour voir sa nation.</p></section>
 </div>
 <script type="application/json" id="pax-data">{{ data|tojson }}</script>
 {% endblock %}
-{% block scripts %}<script src="{{ u('/static/carte.js') }}" defer></script>{% endblock %}
+{% block scripts %}<script src="{{ u('/static/carte.js') }}" defer></script>
+<script src="{{ u('/static/tour.js') }}" defer></script>{% endblock %}

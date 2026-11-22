@@ -67,11 +67,25 @@ def etat_initial(scenario: dict, nation_joueur: str, objectif: str = "") -> dict
         "relations": {cle_relation(a, b): note for a, b, note in scenario["relations"]},
         "guerres": [dict(g) for g in scenario["guerres"]],
         "journal": [],
+        "corrections": [],
+        "dernier_tour": None,
+        "brouillon": None,
+        "historique": [],
         "histoire": [],
         "faits_etablis": [],
         "conseiller": [],
         "diplomatie": {},
     }
+
+
+def evenement_visible(etat: dict, ev: dict) -> bool:
+    """Ce que le joueur (et le conseiller, le rapport, les dirigeants) a le droit de savoir :
+    les événements publics et ceux qui impliquent la nation du joueur. Le narrateur voit tout."""
+    return (not ev.get("secret")) or etat["nation_joueur"] in ev.get("pays", [])
+
+
+def evenements_visibles(etat: dict) -> list[dict]:
+    return [e for e in etat["journal"] if evenement_visible(etat, e)]
 
 
 def territoires_de(etat: dict, nid: str) -> list[str]:
@@ -144,6 +158,6 @@ def resume_etat(etat: dict, noms_territoires: dict[str, str]) -> dict:
                     if nid in g["camp_a"] or nid in g["camp_b"]],
         "guerres_monde": [_guerre_lisible(etat, g) for g in etat["guerres"]
                           if nid not in g["camp_a"] and nid not in g["camp_b"]],
-        "evenements": list(reversed(etat["journal"][-5:])),
+        "evenements": [{**e, "date": date_fr(e["date"])} for e in reversed(evenements_visibles(etat)[-5:])],
         "objectif": etat["objectif"],
     }
