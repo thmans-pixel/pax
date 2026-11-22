@@ -1,12 +1,13 @@
 """Le serveur web de pax (Starlette).
 
 Lancement : uvicorn --factory app.main:creer_app
-Qui est le joueur : YunoHost (SSOwat) transmet son identifiant dans l'en-tête Remote-User.
+Qui est le joueur : YunoHost 12 (SSOwat) le transmet dans l'en-tête Authorization (Basic).
 Le serveur n'écoute que sur 127.0.0.1 : seul nginx peut lui parler.
 """
 from __future__ import annotations
 
 import asyncio
+import base64
 import functools
 import re
 import time
@@ -30,20 +31,29 @@ from .sauvegarde import PartieIntrouvable, Sauvegarde, UTILISATEUR
 from .scenarios import charger_dossiers
 
 LONGUEUR_OBJECTIF = 500
-ENTETES_UTILISATEUR = ("remote-user", "auth-user")
 DELAI_STATUT = 3.0          # secondes avant de dire que le PC de l'IA ne répond pas
 VALIDITE_STATUT = 5.0       # on ne redemande pas à Ollama plus souvent
 
 
 # ------------------------------------------------------------------ identification
 def utilisateur(request: Request) -> str | None:
+    """Le joueur, d'après l'en-tête Authorization que SSOwat (YunoHost 12) pose à chaque requête.
+
+    SSOwat remplace cet en-tête par « Basic base64(identifiant:-) » ; on ne lit que l'identifiant.
+    Remote-User n'est PAS lu : SSOwat ne l'écrase pas, un joueur pourrait l'envoyer lui-même.
+    """
     cfg: Config = request.app.state.config
     if cfg.utilisateur_dev:
         return cfg.utilisateur_dev
-    for nom in ENTETES_UTILISATEUR:
-        v = request.headers.get(nom)
-        if v and UTILISATEUR.fullmatch(v) and v not in (".", ".."):
-            return v
+    auth = request.headers.get("authorization", "")
+    if not auth[:6].lower() == "basic ":
+        return None
+    try:
+        login = base64.b64decode(auth[6:].strip(), validate=True).decode("utf-8").split(":", 1)[0]
+    except (ValueError, UnicodeDecodeError):
+        return None
+    if UTILISATEUR.fullmatch(login) and login not in (".", ".."):
+        return login
     return None
 
 
