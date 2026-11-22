@@ -1,0 +1,15 @@
+#!/bin/bash
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_script_progression "Mise à jour du code..."
+ynh_systemctl --service="$app" --action="stop"
+rm -rf "$install_dir/app" "$install_dir/donnees" "$install_dir/scenarios"
+installer_code
+ynh_app_setting_set --key=prefixe --value="${path%/}"
+
+ynh_config_add_nginx
+ynh_config_add_systemd
+ynh_systemctl --service="$app" --action="start" --wait_until="Application startup complete" --log_path="systemd"
+
+ynh_script_progression "Mise à jour de pax terminée"

@@ -1,0 +1,25 @@
+[Unit]
+Description=Pax, jeu de gestion du monde
+After=network.target
+
+[Service]
+Type=simple
+User=__APP__
+Group=__APP__
+WorkingDirectory=__INSTALL_DIR__
+Environment=PAX_DATA=__DATA_DIR__
+Environment=PAX_SCENARIOS=__INSTALL_DIR__/scenarios
+Environment=PAX_DONNEES=__INSTALL_DIR__/donnees
+Environment=PAX_PREFIXE=__PREFIXE__
+Environment=PAX_ADMINS=__ADMIN__
+Environment=PAX_OLLAMA=__OLLAMA_URL__
+ExecStart=__INSTALL_DIR__/venv/bin/python -m uvicorn --factory app.main:creer_app --host 127.0.0.1 --port __PORT__
+Restart=on-failure
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=__DATA_DIR__
+ProtectHome=read-only
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

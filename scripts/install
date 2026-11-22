@@ -1,0 +1,19 @@
+#!/bin/bash
+source _common.sh
+source /usr/share/yunohost/helpers
+
+ynh_script_progression "Installation du code et de l'environnement Python..."
+installer_code
+
+prefixe="${path%/}"
+ynh_app_setting_set --key=prefixe --value="$prefixe"
+ynh_app_setting_set --key=ollama_url --value="$ollama_url"
+
+ynh_script_progression "Configuration de nginx et du service..."
+ynh_config_add_nginx
+ynh_config_add_systemd
+yunohost service add "$app" --description="Pax, jeu de gestion du monde"
+ynh_systemctl --service="$app" --action="enable"
+ynh_systemctl --service="$app" --action="start" --wait_until="Application startup complete" --log_path="systemd"
+
+ynh_script_progression "Installation de pax terminée"

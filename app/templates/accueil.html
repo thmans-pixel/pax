@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block titre %}Mes parties — pax{% endblock %}
+{% block contenu %}
+<section class="carte-texte">
+  <h1>Mes parties</h1>
+  {% if parties %}
+  <ul class="parties">
+    {% for p in parties %}
+    <li>
+      <div>
+        <strong>{{ p.nation }}</strong> — {{ p.scenario }}<br>
+        <span class="discret">{{ p.date }} · tour {{ p.tour }}</span>
+      </div>
+      <div class="actions">
+        <a class="btn principal" href="{{ u('/partie/' ~ p.id) }}">Reprendre</a>
+        <form method="post" action="{{ u('/partie/' ~ p.id ~ '/supprimer') }}"
+              onsubmit="return confirm('Supprimer cette partie pour de bon ?');">
+          <button class="btn danger" type="submit">Supprimer</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="discret">Aucune partie pour l'instant.</p>
+  {% endif %}
+  <p><a class="btn principal" href="{{ u('/nouvelle') }}">Nouvelle partie</a></p>
+</section>
+{% endblock %}

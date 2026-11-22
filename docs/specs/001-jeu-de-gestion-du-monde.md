@@ -2,7 +2,7 @@
 numero: 001
 titre: Jeu de gestion du monde au tour par tour avec Ollama
 depot: autre (thmans-pixel/pax)
-statut: validée   # brouillon → validée → en cours → livrée
+statut: en cours   # brouillon → validée → en cours → livrée
 date: 2026-11-22
 ---
 
@@ -78,28 +78,28 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
    celui de Thibault, les autres s'ajoutent un par un ; un visiteur sans compte autorisé est
    renvoyé vers la connexion YunoHost ; `./lancer.sh` la démarre aussi en local sur `localhost:8800` pour le
    développement. — *Vérification :* installation réelle sur thnas + manipulation.
-2. [ ] Quand Ollama répond, alors Réglages affiche « Connexion OK » et la liste des modèles
+2. [x] Quand Ollama répond, alors Réglages affiche « Connexion OK » et la liste des modèles
    installés ; quand il ne répond pas, alors un message dit quoi vérifier, la carte et les
    parties restent consultables et les boutons qui demandent l'IA sont grisés.
    — *Vérification :* test avec faux Ollama allumé puis éteint.
-3. [ ] Quand on ouvre « Nouvelle partie », alors les deux scénarios livrés apparaissent avec
+3. [x] Quand on ouvre « Nouvelle partie », alors les deux scénarios livrés apparaissent avec
    nom, date de départ et description. — *Vérification :* test.
-4. [ ] Quand un fichier de scénario est invalide (nation sans territoire, territoire inconnu,
+4. [x] Quand un fichier de scénario est invalide (nation sans territoire, territoire inconnu,
    relation vers une nation inconnue, YAML cassé), alors il est écarté avec un message qui
    nomme le fichier et la faute, et les autres scénarios restent jouables.
    — *Vérification :* test avec trois fichiers fautifs.
-5. [ ] Quand on dépose un nouveau fichier YAML valide dans `scenarios/`, alors il apparaît
+5. [x] Quand on dépose un nouveau fichier YAML valide dans `scenarios/`, alors il apparaît
    au rechargement de la page, sans toucher au code. — *Vérification :* test.
 6. [ ] Sur la carte, chaque territoire a la couleur de sa nation ; au survol s'affichent le
    territoire et sa nation ; un clic ouvre la fiche de la nation ; la molette zoome et le
    glisser déplace. — *Vérification :* manipulation dans Brave sur le PC.
-7. [ ] Dans le scénario 1939 au départ, l'Autriche et la Tchéquie appartiennent à
+7. [x] Dans le scénario 1939 au départ, l'Autriche et la Tchéquie appartiennent à
    l'Allemagne, l'Inde au Royaume-Uni, l'Ukraine à l'URSS, et la Pologne est indépendante.
    — *Vérification :* test sur l'état chargé.
-8. [ ] Quand on choisit une nation et qu'on commence, alors la partie est enregistrée dans
+8. [x] Quand on choisit une nation et qu'on commence, alors la partie est enregistrée dans
    `data/parties/` ; après arrêt et relance du jeu, « Reprendre » rend exactement le même état.
    — *Vérification :* test (comparaison du JSON avant/après).
-8 bis. [ ] Chaque joueur ne voit, ne reprend et ne supprime que ses propres parties, d'après
+8 bis. [x] Chaque joueur ne voit, ne reprend et ne supprime que ses propres parties, d'après
    l'identifiant transmis par YunoHost ; une requête sans identifiant est refusée (sauf en
    mode développement local). — *Vérification :* test avec deux identifiants.
 
@@ -144,7 +144,7 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
    s'affiche, avec la possibilité d'annuler le dernier tour. — *Vérification :* test.
 
 **Les aides de l'IA**
-18. [ ] L'onglet État affiche sans IA : date, tour, chiffres de la nation et leur évolution
+18. [x] L'onglet État affiche sans IA : date, tour, chiffres de la nation et leur évolution
    depuis le début, relations classées, guerres en cours, derniers événements.
    — *Vérification :* test du rendu.
 19. [ ] Le bouton « Rapport de situation » renvoie : la situation en quelques lignes, les
@@ -159,7 +159,7 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
    — *Vérification :* test du contenu des requêtes.
 
 **Ensemble**
-22. [ ] `pytest` passe sans Ollama (faux Ollama). — *Vérification :* lancer `pytest`.
+22. [x] `pytest` passe sans Ollama (faux Ollama). — *Vérification :* lancer `pytest`.
 23. [ ] Depuis thnas avec l'Ollama du PC, 5 tours d'un mois dans le scénario 1939 avec le modèle retenu : aucun
    tour perdu, durée de chaque tour notée dans la PR. — *Vérification :* partie réelle.
 
@@ -310,3 +310,23 @@ qui rend le jeu tenable avec un modèle local de 16 Go de VRAM.
 Aucune. Réponses de Thibault (22/11/2026) : page web avec carte ; jeu sur thnas, IA du PC ;
 accès par les comptes YunoHost, adultes seulement pour commencer, sans filtre de contenu ;
 durée des tours au choix du joueur.
+
+## Livraison — étape 1 (socle)
+
+**Fait** : format et vérification des scénarios (fautes cumulées, fichier fautif écarté), deux
+scénarios livrés (Monde actuel au 22/11/2026 : 171 nations ; Seconde Guerre mondiale au
+01/09/1939 : 69 nations), carte SVG cliquable, choix de la nation, sauvegarde/reprise par joueur,
+Réglages avec test de connexion, statut de l'IA, paquet YunoHost, `lancer.sh`. 27 tests `pytest` verts
+(sans Ollama, avec un faux Ollama). Critères cochés : 2, 3, 4, 5, 7, 8, 8 bis, 18, 22.
+
+**Écart avec la spec** : Starlette + `urllib` au lieu de FastAPI + `httpx` (non installables dans
+l'environnement de réalisation). Sans conséquence pour l'usage.
+
+**À vérifier à la main (non testable ici)** :
+- critère 1 : l'installation sur thnas (paquet YunoHost écrit mais jamais exécuté) ;
+- critère 6 (partie JavaScript) : survol et clic sur la carte dans un vrai navigateur ;
+- l'en-tête d'identification envoyé par YunoHost (ouvrir `/moi` après installation) ;
+- ouverture d'Ollama du PC à thnas (`OLLAMA_HOST`, pare-feu).
+- les faits du scénario « Monde actuel » : voir la liste `ecarts` du fichier (dirigeants non revérifiés).
+
+Le bouton « Avancer » est volontairement désactivé jusqu'à l'étape 2.

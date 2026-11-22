@@ -1,0 +1,7 @@
+#!/bin/bash
+source /usr/share/yunohost/helpers
+
+ynh_script_progression "Suppression du service et de nginx..."
+yunohost service remove "$app" || true
+ynh_config_remove_systemd
+ynh_config_remove_nginx
