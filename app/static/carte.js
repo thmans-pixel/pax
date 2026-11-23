@@ -78,7 +78,7 @@
   function montrerFiche(nid) {
     if (!fiche) return;
     var f = data.fiches[nid];
-    fiche.innerHTML = '';
+    fiche.textContent = '';
     if (!f) { var v = document.createElement('p'); v.className = 'discret'; v.textContent = 'Aucune nation ici.'; fiche.appendChild(v); return; }
     var h = document.createElement('h2');
     var pastille = document.createElement('span'); pastille.className = 'pastille'; pastille.style.background = f.couleur;
@@ -92,6 +92,14 @@
     var t = f.territoires;
     ligne(fiche, 'Territoires', t.slice(0, 14).join(', ') + (t.length > 14 ? ' … (+' + (t.length - 14) + ')' : ''));
     if (f.majeure) ligne(fiche, '', 'Grande puissance du scénario.');
+    if (f.joueur) ligne(fiche, '', 'C’est votre nation.');
+    if (f.relation) ligne(fiche, 'Relation avec vous', (f.relation.note > 0 ? '+' : '') + f.relation.note + ' (' + f.relation.palier + ')');
+    if (f.guerres) {
+      if (!f.guerres.length) ligne(fiche, 'Guerres', 'aucune.');
+      f.guerres.forEach(function (g) {
+        ligne(fiche, 'Guerre', g.nom + ' : ' + g.camp_a.join(', ') + ' contre ' + g.camp_b.join(', ') + (g.depuis ? ' (depuis le ' + g.depuis + ')' : ''));
+      });
+    }
   }
 
   var courante = null;
@@ -109,8 +117,14 @@
   svg.addEventListener('click', function (e) {
     if (bouge) return;
     var p = e.target.closest('.pays');
-    if (p) choisir(p.dataset.n || null);
+    if (!p) return;
+    choisir(p.dataset.n || null);
+    // un vrai clic (pas un glisser) : la roue d'actions (roue.js) s'ouvre sur ce pays
+    svg.dispatchEvent(new CustomEvent('pax:pays', {
+      bubbles: true, detail: { nid: p.dataset.n || null, territoire: p.dataset.t, x: e.clientX, y: e.clientY }
+    }));
   });
+  window.paxCarte = { choisir: choisir, fiche: fiche, nomTerritoire: function (t) { return data.noms[t] || t; } };
   document.querySelectorAll('.puce').forEach(function (b) {
     b.addEventListener('click', function () { choisir(b.dataset.nid); });
   });
