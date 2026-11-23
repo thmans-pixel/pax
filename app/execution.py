@@ -325,6 +325,9 @@ def annuler(app, user: str, pid: str) -> dict:
     with g.verrou:
         if g.actif(user, pid):
             raise TourEnCours("Attendez la fin du tour avant d'annuler.")
+        if g.aide_active(user, pid):
+            # sinon l'aide répondrait d'après le tour annulé et son texte resterait dans la partie
+            raise TourEnCours("Attendez la réponse de l'IA avant d'annuler.")
         etat = app.state.sauvegarde.lire(user, pid)
         hist = etat.get("historique") or []
         if not hist:

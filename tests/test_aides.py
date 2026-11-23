@@ -351,3 +351,18 @@ def test_aides_partie_terminee_refusee(thibault, faux, app):
     e["territoires"] = {t: ("allemagne" if n == "france" else n) for t, n in e["territoires"].items()}
     app.state.sauvegarde.enregistrer("thibault", e)
     assert demander(thibault, pid, "conseiller", "x").status == 409
+
+
+def test_annulation_refusee_pendant_une_aide(thibault, faux, app):
+    # relecture étape 3 : une aide en cours répondrait d'après le tour annulé
+    pid = creer(thibault)
+    faux.programmer(reponse(1))
+    assert avancer(thibault, pid).status == 202
+    attendre(thibault, pid)
+    faux.pause, faux.morceau = 0.1, 20
+    faux.programmer({"reponse": "lent"})
+    assert demander(thibault, pid, "conseiller", "a").status == 202
+    r = thibault.post(f"/partie/{pid}/annuler", entetes={"Origin": "http://testserver"})
+    assert r.status == 409
+    attendre_aide(thibault, pid)
+    assert thibault.post(f"/partie/{pid}/annuler", entetes={"Origin": "http://testserver"}).status in (200, 303)

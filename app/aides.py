@@ -225,7 +225,7 @@ def lire_rapport(texte: str) -> tuple[dict | None, list[str]]:
     f = []
     if not situation:
         f.append("« situation » doit être un paragraphe de texte non vide")
-    if not sugg:
+    if len(sugg) < SUGGESTIONS:
         f.append(f"« suggestions » doit contenir {SUGGESTIONS} ordres")
     if f:
         return None, f
