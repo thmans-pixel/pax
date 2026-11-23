@@ -39,6 +39,10 @@ PLAFONDS = {
 }
 
 
+SEUIL_RENDEMENT = 90         # au-dessus, une hausse de chiffre est divisée par deux
+CODES_PAR_CAMP = 30          # territoires listés par camp et par guerre dans la requête (budget de contexte)
+
+
 def plafonds(duree: str) -> dict:
     c, r, t = PLAFONDS[duree]
     return {"chiffre": c, "relation": r, "transferts": t}
@@ -168,6 +172,10 @@ def schema_reponse() -> dict:
             "territoires": {"type": "array", "items": {"type": "object", "properties": {
                 "territoire": texte, "vers": texte, "base": {"type": "string", "enum": BASES},
                 "raison": texte}, "required": ["territoire", "vers", "base"]}},
+            "fronts": {"type": "array", "items": {"type": "object", "properties": {
+                "guerre": texte, "avance": {"type": "string", "enum": ["a", "b", "aucun"]},
+                "par": texte, "territoires_pris": liste_ids, "explication": texte},
+                "required": ["guerre", "avance", "par", "territoires_pris", "explication"]}},
             "nouvelle_nation": {"type": ["object", "null"], "properties": {
                 "nom": texte, "dirigeant": texte, "regime": texte, "couleur": texte,
                 "territoires": liste_ids}},
@@ -177,7 +185,7 @@ def schema_reponse() -> dict:
         # Tout est obligatoire : avec la sortie contrainte d'Ollama, un modèle saute les clés
         # facultatives et ne change alors jamais l'état du monde (constaté sur thnas).
         "required": ["evenements", "ordres", "chiffres", "relations", "guerres", "territoires",
-                     "nouvelle_nation", "resume", "faits"],
+                     "fronts", "nouvelle_nation", "resume", "faits"],
     }
 
 
@@ -205,9 +213,15 @@ Ne laisse ces listes vides que s'il ne s'est vraiment rien passé.
 - Les « règles de simulation » datées dans la période du tour se produisent, avec leurs \
 conséquences dans les listes (une invasion : « guerres » et « territoires »), sauf si les ordres \
 du joueur ou la situation les ont rendues impossibles ; dis-le alors dans un événement.
-- Une guerre en cours n'est pas figée : selon la durée du tour et le rapport de forces (armée, \
-alliés), le front bouge et des territoires changent de mains (base « guerre »), dans la limite \
-des plafonds. Un pays submergé peut perdre tous ses territoires.
+- « fronts » est OBLIGATOIRE : une entrée par guerre de « Guerres en cours » (nom exact) : « avance » \
+(« a », « b » ou « aucun »), « par » (nation du camp qui avance qui reçoit les territoires), \
+« territoires_pris » (codes tenus par le camp qui recule) et « explication ». Le front bouge selon la \
+durée et le rapport de forces, dans la limite des plafonds ; un pays submergé peut tout perdre. \
+Les fronts reflètent les règles datées de « Ce tour ».
+- Tout effort a un coût : plus d'armée se paie en économie ou stabilité ; une guerre use l'économie \
+et la stabilité des deux camps ; un succès n'augmente pas tout à la fois. La hausse totale des chiffres \
+d'une nation ne dépasse pas le plafond d'un chiffre ; au-dessus de 90, une hausse est divisée par deux.
+- Une paix doit être racontée par un événement du tour citant les deux camps dans « pays ».
 - « nom » d'une guerre déclarée : un nom court comme « Guerre franco-allemande ».
 - Les variations de chiffres et de relations doivent rester modestes et respecter les plafonds donnés.
 - Un territoire ne change de mains que par une guerre en cours (« guerre »), un traité ou une \
@@ -259,6 +273,27 @@ def _en_vue(etat: dict) -> list[str]:
         if n["majeure"] or en_guerre(etat, nid, joueur) or palier(note) == "allié":
             res.append(nid)
     return sorted(res)
+
+
+def _codes_camp(etat: dict, camp: list[str]) -> str:
+    """« nation [CODES] ; … » : les territoires tenus par un camp, bornés (CODES_PAR_CAMP au plus)."""
+    vivants = [n for n in camp if n in etat["nations"]]
+    par = max(3, CODES_PAR_CAMP // max(1, len(vivants)))
+    morceaux = []
+    for n in vivants:
+        terr = territoires_de(etat, n)
+        reste = len(terr) - par
+        liste = ", ".join(terr[:par]) + (f", … (+{reste} autres)" if reste > 0 else "")
+        morceaux.append(f"{n} [{liste or 'aucun territoire'}]")
+    return " + ".join(morceaux)
+
+
+def _lignes_guerres(etat: dict) -> list[str]:
+    lignes = []
+    for g in etat["guerres"]:
+        lignes.append(f"- « {g['nom']} » — camp a : {_codes_camp(etat, g['camp_a'])} ; "
+                      f"camp b : {_codes_camp(etat, g['camp_b'])}")
+    return lignes or ["(aucune)"]
 
 
 def _regles_utiles(etat: dict, debut: str, fin: str) -> list[dict]:
@@ -335,14 +370,22 @@ def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: 
 
     section("Contexte du scénario", [etat["scenario"]["contexte"].strip()])
     regles = _regles_utiles(etat, debut, fin)
-    if regles:
+    datees = [r for r in regles if r["date"] and debut <= r["date"] <= fin]      # mises en avant dans « Ce tour »
+    autres_regles = [r for r in regles if r not in datees]
+    if autres_regles:
         section("Règles de simulation utiles pour cette période",
-                [f"- {(date_fr(r['date']) + ' : ') if r['date'] else ''}{r['texte']}" for r in regles])
-    section("Ce tour", [
+                [f"- {(date_fr(r['date']) + ' : ') if r['date'] else ''}{r['texte']}" for r in autres_regles])
+    ce_tour = [
         f"Début : {date_fr(debut)} ({debut}). Fin : {date_fr(fin)} ({fin}). Durée : {DUREES[duree]['libelle']}.",
         f"Plafonds pour ce tour : un chiffre varie de ±{p['chiffre']} au plus, une relation de "
-        f"±{p['relation']} au plus, {p['transferts']} transferts de territoires au plus.",
-        f"Tour numéro {etat['tour'] + 1}."])
+        f"±{p['relation']} au plus, {p['transferts']} transferts de territoires au plus (fronts compris). "
+        f"Pour chaque nation, la hausse totale de ses chiffres ne dépasse pas {p['chiffre']}.",
+        f"Tour numéro {etat['tour'] + 1}."]
+    for r in datees:
+        texte = " ".join(r["texte"].split())
+        ce_tour.append(f"À cette date ({date_fr(r['date'])}) dans l'histoire réelle : {texte} — fais-le arriver, "
+                       "sauf si les ordres du joueur l'empêchent ; « fronts » reflète ces règles.")
+    section("Ce tour", ce_tour)
     section("La nation du joueur", [_ligne_nation(etat, joueur, noms_terr, True)])
     vue = _en_vue(etat)
     section("Puissances en vue", [_ligne_nation(etat, n, noms_terr, True) for n in vue] or ["(aucune)"])
@@ -364,8 +407,7 @@ def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: 
         if a in etat["nations"] and b in etat["nations"] and not est_disparue(etat, a) and not est_disparue(etat, b):
             rel.append(f"- {a} / {b} : {note:+d} ({palier(note)})")
     section("Relations notables", rel or ["(aucune)"])
-    section("Guerres en cours", [
-        f"- {g['nom']} : {', '.join(g['camp_a'])} contre {', '.join(g['camp_b'])}" for g in etat["guerres"]] or ["(aucune)"])
+    section("Guerres en cours (une entrée « fronts » par guerre, avec ce nom exact)", _lignes_guerres(etat))
     if etat.get("faits_etablis"):
         section("Faits établis", [f"- {f}" for f in etat["faits_etablis"][-60:]])
     hist = etat.get("histoire", [])
@@ -448,7 +490,7 @@ def verifier_forme(obj: dict) -> list[str]:
     """Fautes de forme qui justifient une relance (le reste est corrigé sans relance)."""
     f = []
     listes = {"evenements": True, "ordres": True, "chiffres": False, "relations": False,
-              "guerres": False, "territoires": False, "faits": False}
+              "guerres": False, "territoires": False, "fronts": False, "faits": False}
     for cle, obligatoire in listes.items():
         v = obj.get(cle)
         if v is None:
@@ -483,6 +525,19 @@ def _issue(v) -> str | None:
     return None
 
 
+def _repartir(hausses: dict[str, int], permis: int) -> dict[str, int]:
+    """Ramène des hausses à une somme de `permis`, proportionnellement (restes aux plus grosses hausses)."""
+    total = sum(hausses.values())
+    part = {c: h * permis // total for c, h in hausses.items()}
+    reste = permis - sum(part.values())
+    for c in sorted(hausses, key=lambda c: (-(hausses[c] * permis % total), -hausses[c])):
+        if reste <= 0:
+            break
+        part[c] += 1
+        reste -= 1
+    return part
+
+
 def _slug(nom: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", _norm(nom)).strip("-")
     return s or "nouvelle-nation"
@@ -496,6 +551,7 @@ class Application:
         self.noms_terr = noms_terr
         self.duree = duree
         self.p = plafonds(duree)
+        self.transferts = 0                       # transferts de territoires faits ce tour (fronts compris)
         self.corrections: list[str] = []          # toutes : renvoyées à l'IA au tour suivant
         self.corrections_joueur: list[str] = []   # celles que le joueur a le droit de lire
         self.index_nations: dict[str, str] = {}
@@ -580,13 +636,37 @@ class Application:
                 self.corr(f"Variation de chiffre de {self.etat['nations'][nid]['nom']} : chiffre ou valeur illisible, ignorée.")
                 continue
             cumul[(nid, cle)] = cumul.get((nid, cle), 0) + v
+        # 1. plafond par chiffre (après cumul), 2. hausse divisée par deux au-dessus de 90,
+        # 3. coût : la hausse nette d'une nation ne dépasse pas le plafond d'un seul chiffre.
+        par_nation: dict[str, dict[str, int]] = {}
         for (nid, cle), v in cumul.items():
+            n = self.etat["nations"][nid]
+            nom = n["nom"]
             borne = _borner(v, -self.p["chiffre"], self.p["chiffre"])
             if borne != v:
-                self.corr(f"{LIBELLES_CHIFFRES[cle]} de {self.etat['nations'][nid]['nom']} : {v:+d} au total ramené à "
+                self.corr(f"{LIBELLES_CHIFFRES[cle]} de {nom} : {v:+d} au total ramené à "
                           f"{borne:+d} (plafond de ±{self.p['chiffre']} pour ce tour).")
+            if borne > 0 and n[cle] > SEUIL_RENDEMENT:
+                moitie = borne // 2
+                self.corr(f"{LIBELLES_CHIFFRES[cle]} de {nom} : {borne:+d} ramené à {moitie:+d} "
+                          f"(au-dessus de {SEUIL_RENDEMENT}, une hausse est divisée par deux).")
+                borne = moitie
+            par_nation.setdefault(nid, {})[cle] = borne
+        for nid, deltas in par_nation.items():
+            nom = self.etat["nations"][nid]["nom"]
+            hausses = {c: d for c, d in deltas.items() if d > 0}
+            baisses = -sum(d for d in deltas.values() if d < 0)
+            permis = self.p["chiffre"] + baisses            # hausses totales permises : net <= plafond
+            total = sum(hausses.values())
+            if total > permis:
+                net = total - baisses
+                nouveau = _repartir(hausses, permis)
+                self.corr(f"{nom} : hausse nette de {net:+d} au total ramenée à {self.p['chiffre']:+d} "
+                          f"(tout effort a un coût ; plafond de {self.p['chiffre']} pour ce tour).")
+                deltas.update(nouveau)
             n = self.etat["nations"][nid]
-            n[cle] = _borner(n[cle] + borne, 0, 100)
+            for cle, d in deltas.items():
+                n[cle] = _borner(n[cle] + d, 0, 100)
 
     def relations(self, bruts: list):
         """Même principe : cumul par paire de nations, puis plafond."""
@@ -631,7 +711,8 @@ class Application:
                 nom = " ".join(str(g.get("nom") or "").split())[:100] or "Guerre"
                 self.etat["guerres"].append({"nom": nom, "camp_a": camps[0], "camp_b": camps[1], "depuis": debut})
 
-    def paix(self, bruts: list):
+    def paix(self, bruts: list, evenements: list[dict]):
+        """Une paix n'est appliquée que si un événement du tour la raconte en citant les deux camps."""
         for g in bruts:
             if not _norm(g.get("action")).startswith("paix"):
                 continue
@@ -645,8 +726,77 @@ class Application:
                     break
             if trouvee is None:
                 self.corr(f"Paix « {_cite(g.get('nom') or '?')} » : aucune guerre correspondante, ignorée.")
-            else:
-                self.etat["guerres"].remove(trouvee)
+                continue
+            raconte = any(set(e["pays"]) & set(trouvee["camp_a"]) and set(e["pays"]) & set(trouvee["camp_b"])
+                          for e in evenements)
+            if not raconte:
+                self.corr(f"Paix « {_cite(trouvee['nom'])} » refusée : aucun événement du tour ne la raconte en citant "
+                          "les nations des deux camps dans « pays ». La guerre continue.",
+                          not self.implique_joueur(*trouvee["camp_a"], *trouvee["camp_b"]))
+                continue
+            self.etat["guerres"].remove(trouvee)
+
+    def fronts(self, bruts: list, avant: list[dict]):
+        """Les fronts : une entrée par guerre en cours. Les territoires pris passent par `transferer`
+        (même plafond que les transferts ordinaires)."""
+        vus: set[int] = set()
+        resultats = []
+        for f in bruts:
+            nom = _norm(f.get("guerre"))
+            g = next((w for w in self.etat["guerres"] if _norm(w["nom"]) == nom), None) if nom else None
+            if g is None:
+                self.corr(f"Front « {_cite(f.get('guerre') or '?')} » : aucune guerre en cours de ce nom, ignoré.")
+                continue
+            vus.add(id(g))
+            prive = not self.implique_joueur(*g["camp_a"], *g["camp_b"])
+            av = _norm(f.get("avance"))
+            explication = " ".join(str(f.get("explication") or "").split())[:400]
+            pris = []
+            if av not in ("a", "b"):
+                if av not in ("", "aucun", "aucune", "non"):
+                    self.corr(f"Front « {_cite(g['nom'])} » : « avance » doit être a, b ou aucun (« {_cite(f.get('avance'))} »), traité comme aucun.", prive)
+                if _liste_textes(f.get("territoires_pris")):
+                    self.corr(f"Front « {_cite(g['nom'])} » : des territoires sont pris alors que personne n'avance, ignorés.", prive)
+                resultats.append({"guerre": g["nom"], "avance": "aucun", "territoires_pris": [], "explication": explication})
+                continue
+            gagnant, perdant = (g["camp_a"], g["camp_b"]) if av == "a" else (g["camp_b"], g["camp_a"])
+            vivants = [n for n in gagnant if n in self.etat["nations"] and not est_disparue(self.etat, n)]
+            par = self.index_nations.get(_norm(f.get("par"))) if isinstance(f.get("par"), str) else None
+            if par not in vivants:
+                if _liste_textes(f.get("territoires_pris")) and f.get("par"):
+                    self.corr(f"Front « {_cite(g['nom'])} » : « {_cite(f.get('par'))} » n'est pas une nation vivante du camp qui avance, "
+                              "territoires attribués à la première nation de ce camp.", prive)
+                par = vivants[0] if vivants else None
+            for v in _liste_textes(f.get("territoires_pris")):
+                if par is None:
+                    break
+                ctx = f"Front « {_cite(g['nom'])} », territoire « {_cite(self.noms_terr.get(v, v))} »"
+                terr = self.territoire(v, ctx, prive)
+                if terr is None:
+                    continue
+                ancien = self.etat["territoires"][terr]
+                if ancien not in perdant:
+                    nom_ancien = self.etat["nations"][ancien]["nom"]
+                    self.corr(f"{ctx} refusé : il appartient à {nom_ancien}, qui n'est pas dans le camp qui recule.", prive)
+                    continue
+                if self.transferer(terr, par, ctx, prive):
+                    pris.append(terr)
+            resultats.append({"guerre": g["nom"], "avance": av, "territoires_pris": pris, "explication": explication})
+        for g in self.etat["guerres"]:
+            if any(g is w for w in avant) and id(g) not in vus:
+                self.corr(f"Guerre « {_cite(g['nom'])} » : absente de « fronts » (une entrée par guerre en cours est obligatoire), front figé.",
+                          not self.implique_joueur(*g["camp_a"], *g["camp_b"]))
+        return resultats
+
+    def transferer(self, terr: str, dest: str, ctx: str, prive: bool) -> bool:
+        """Applique un transfert déjà validé, dans la limite du plafond du tour (partagé par tous les chemins)."""
+        if self.transferts >= self.p["transferts"]:
+            nom_dest = self.etat["nations"][dest]["nom"] if dest in self.etat["nations"] else dest
+            self.corr(f"{ctx} vers {nom_dest} refusé : plafond de {self.p['transferts']} transferts atteint pour ce tour.", prive)
+            return False
+        self.etat["territoires"][terr] = dest
+        self.transferts += 1
+        return True
 
     def territoires(self, bruts: list, nouvelle: dict | None, evenements: list[dict]):
         """Transferts, dans l'ordre donné, jusqu'au plafond. Chaque refus est une correction.
@@ -668,7 +818,6 @@ class Application:
         if nouvelle is not None:
             for v in _liste_textes(nouvelle.get("territoires")):
                 demandes.append({"territoire": v, "vers": nouvelle_id, "base": "indépendance"})
-        faits = 0
         cree = False
         for d in demandes:
             brut_t = d.get("territoire")
@@ -707,14 +856,14 @@ class Application:
             if not ok:
                 self.corr(f"{ctx} vers {nom_dest} refusé : {pourquoi}.", prive)
                 continue
-            if faits >= self.p["transferts"]:
+            if self.transferts >= self.p["transferts"]:
                 self.corr(f"{ctx} vers {nom_dest} refusé : plafond de {self.p['transferts']} transferts atteint pour ce tour.", prive)
                 continue
             if dest == nouvelle_id and not cree:
                 self._creer_nation(nouvelle_id, nouvelle)
                 cree = True
             self.etat["territoires"][terr] = dest
-            faits += 1
+            self.transferts += 1
         if nouvelle is not None and not cree:
             self.corr(f"Nouvelle nation « {_cite(nouvelle.get('nom'))} » : aucun territoire n'a pu lui être donné, non créée.")
 
@@ -742,10 +891,12 @@ def appliquer(etat: dict, reponse: dict, noms_terr: dict[str, str], ordres: list
     evenements = a.evenements(reponse.get("evenements") or [], debut, fin)
     a.chiffres(reponse.get("chiffres") or [])
     a.relations(reponse.get("relations") or [])
+    avant_guerres = list(neuf["guerres"])                    # les guerres que la requête a listées
     a.declarations(reponse.get("guerres") or [], debut)
+    fronts = a.fronts(reponse.get("fronts") or [], avant_guerres)
     nouvelle = reponse.get("nouvelle_nation")
     a.territoires(reponse.get("territoires") or [], nouvelle if isinstance(nouvelle, dict) else None, evenements)
-    a.paix(reponse.get("guerres") or [])
+    a.paix(reponse.get("guerres") or [], evenements)
     # issue de chaque ordre
     issues = []
     donnees = {}
@@ -775,6 +926,7 @@ def appliquer(etat: dict, reponse: dict, noms_terr: dict[str, str], ordres: list
             neuf["faits_etablis"].append(f)
     neuf["corrections"] = a.corrections[:40]                 # pour l'IA au tour suivant
     neuf["corrections_joueur"] = a.corrections_joueur[:40]   # pour l'encart du joueur
-    neuf["dernier_tour"] = {"tour": tour, "ordres": list(ordres), "duree": duree, "issues": issues}
+    neuf["dernier_tour"] = {"tour": tour, "ordres": list(ordres), "duree": duree, "issues": issues,
+                            "fronts": fronts}
     neuf["brouillon"] = None
     return neuf, a.corrections

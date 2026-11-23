@@ -23,5 +23,13 @@
     <p><button type="submit" class="btn principal">Enregistrer</button></p>
   </form>
 </section>
+<section class="carte-texte" id="diagnostic">
+  <h2>Diagnostic du dernier tour</h2>
+  <p class="discret">Dernière réponse brute de l'IA (écrasée à chaque tour). Réservé aux administrateurs : le
+    texte peut contenir des événements secrets.</p>
+  {% if diagnostic %}
+  <details><summary>Voir la réponse brute</summary><pre style="white-space:pre-wrap;overflow-x:auto">{{ diagnostic }}</pre></details>
+  {% else %}<p class="discret">Aucun tour joué depuis l'installation.</p>{% endif %}
+</section>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/reglages.js') }}" defer></script>{% endblock %}
