@@ -82,7 +82,7 @@
     <div class="volet" data-volet="journal" hidden>
       {% if journal %}
       {% for tour, evenements in journal %}
-      <h3>Tour {{ tour }}</h3>
+      <h3>Tour {{ tour }}{% if mesures.get(tour) %} <span class="discret mesure">— {{ mesures[tour] }}</span>{% endif %}</h3>
       {% for e in evenements %}
       <article class="evenement{% if e.secret %} secret{% endif %}">
         <strong>{{ e.titre }}</strong>{% if e.secret %} <span class="etiquette">secret</span>{% endif %}<br>

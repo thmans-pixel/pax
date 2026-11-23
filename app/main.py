@@ -188,6 +188,7 @@ async def partie(request: Request):
     par_tour: dict[int, list[dict]] = {}
     for e in reversed(visibles):
         par_tour.setdefault(e["tour"], []).append({**e, "date_lisible": date_fr(e["date"])})
+    mesures = {h["tour"]: _mesure_lisible(h["mesure"]) for h in etat.get("histoire", []) if h.get("mesure")}
     brouillon = etat.get("brouillon") or {}
     interlocuteurs = sorted(({"id": nid, "nom": n["nom"], "dirigeant": n["dirigeant"]}
                              for nid, n in etat["nations"].items()
@@ -200,7 +201,7 @@ async def partie(request: Request):
     return page(request, "partie.html", etat=etat, resume=resume_etat(etat, carte.noms),
                 svg=carte.svg(etat["territoires"], etat["nations"]), data=donnees_carte(carte, etat),
                 paliers=PALIERS, libelles=LIBELLES_CHIFFRES, durees=moteur.DUREES,
-                journal=sorted(par_tour.items(), reverse=True), fin=moteur.partie_terminee(etat),
+                journal=sorted(par_tour.items(), reverse=True), mesures=mesures, fin=moteur.partie_terminee(etat),
                 ordres_saisis=brouillon.get("ordres") or [""],
                 duree_choisie=brouillon.get("duree") or (etat.get("dernier_tour") or {}).get("duree") or moteur.DUREE_DEFAUT,
                 dernier=etat.get("dernier_tour"), corrections=etat.get("corrections_joueur") or [],
@@ -403,6 +404,12 @@ async def moi(request: Request):
 
 
 # ------------------------------------------------------------------ assemblage
+
+def _mesure_lisible(m: dict) -> str:
+    s = int(m.get("secondes") or 0)
+    duree = f"{s // 60} min {s % 60:02d} s" if s >= 60 else f"{s} s"
+    return f"joué en {duree} avec {m.get('modele') or '?'}" + (" (après une relance)" if m.get("relance") else "")
+
 def creer_app(config: Config | None = None) -> Starlette:
     config = config or Config.depuis_env()
     racine = Path(__file__).resolve().parent

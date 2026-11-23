@@ -624,3 +624,14 @@ def test_mention_secret_dans_le_titre_rend_secret(etat39, noms):
     j = {e["titre"]: e for e in appliquer(etat39, noms, rep)[0]["journal"]}
     assert j["Combats de Khalkhin Gol"]["secret"] is True          # mention retirée du titre
     assert j["Pacte"]["secret"] is True and j["Mobilisation"]["secret"] is False
+
+
+def test_23_duree_et_modele_affiches_dans_le_journal(thibault, faux, app):
+    pid = creer(thibault)
+    faux.programmer(reponse(1))
+    assert avancer(thibault, pid).status == 202
+    attendre(thibault, pid)
+    e = app.state.sauvegarde.lire("thibault", pid)
+    m = e["histoire"][-1]["mesure"]
+    assert m["secondes"] >= 0 and m["modele"] and m["relance"] is False
+    assert "joué en" in thibault.get(f"/partie/{pid}").texte

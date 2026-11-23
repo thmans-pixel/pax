@@ -9,10 +9,49 @@ une marque).
 
 ## État
 
-Étape 1 de la spec 001 faite : scénarios, carte, choix de la nation, parties enregistrées, Réglages.
-L'IA ne joue pas encore (étapes 2 à 4, voir `docs/specs/`).
+Jouable : scénarios, carte, tours joués par l'IA (ordres, journal, corrections, annulation),
+rapport de situation, conseiller, diplomatie. Spec : `docs/specs/001-jeu-de-gestion-du-monde.md`.
 
-Essai local : `./lancer.sh` puis http://127.0.0.1:8800 — tests : `pip install -r requirements-dev.txt && python -m pytest tests`.
+## Installer sur un serveur YunoHost 12
+
+YunoHost refuse une adresse GitHub de branche : on installe depuis un clone local.
+
+```
+git clone https://github.com/thmans-pixel/pax.git ~/pax
+sudo yunohost app install ~/pax
+```
+
+Questions : domaine, chemin (`/` pour un domaine dédié, sinon `/pax`), groupe d'accès
+(laisser `admins` au début), administrateur du jeu (accès aux Réglages), adresse d'Ollama
+(modifiable ensuite dans Réglages).
+
+Donner l'accès à un autre compte : `sudo yunohost user permission add pax.main <compte>`.
+
+Mettre à jour :
+
+```
+cd ~/pax && git pull
+sudo yunohost app upgrade pax -u ~/pax
+```
+
+Vérifier l'identification : ouvrir `<adresse du jeu>/moi`, qui doit afficher votre compte.
+
+## Brancher l'IA (Ollama sur un autre PC du réseau)
+
+1. Sur le PC, Ollama doit écouter le réseau : `Environment=OLLAMA_HOST=0.0.0.0:11434` dans son
+   service systemd, puis redémarrer le service. Le pare-feu du PC doit laisser passer le port
+   11434 depuis le serveur (idéalement depuis lui seul).
+2. Depuis le serveur, vérifier : `curl -s -m 5 http://<ip du PC>:11434/api/tags`.
+3. Dans le jeu, page **Réglages** : adresse `http://<ip du PC>:11434`, **Tester la connexion**,
+   choisir le modèle, **Enregistrer**. Le badge en haut à droite passe à « IA prête ».
+
+Avec 16 Go de mémoire graphique : un modèle de 12 à 14 milliards de paramètres et un contexte de
+16 384 jetons. Le Journal indique, pour chaque tour, sa durée et le modèle utilisé.
+
+## Essai local et tests
+
+`./lancer.sh` puis http://127.0.0.1:8800 (identité fixe `dev`, sans YunoHost).
+Tests : `pip install -r requirements-dev.txt && python -m pytest tests` (un faux Ollama, sans réseau).
 
 ## Demande d'origine (22/11/2026)
 

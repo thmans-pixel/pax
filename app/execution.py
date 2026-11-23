@@ -301,6 +301,10 @@ class Gestionnaire:
         with self.verrou:
             etat = app.state.sauvegarde.lire(user, pid)
             neuf, _ = t.appliquer(etat, obj, app.state.carte.noms, job.ordres, job.duree)
+            # mesure du tour, affichée dans le Journal (critère 23 : durée notée pour chaque tour)
+            neuf["histoire"][-1]["mesure"] = {
+                "secondes": round(time.monotonic() - (job.debut_ecriture or job.debut)),
+                "modele": reg["modele"], "relance": bool(job.relance)}
             avant = copy.deepcopy(etat)
             avant.pop("historique", None)
             avant["brouillon"] = None
