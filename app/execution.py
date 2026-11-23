@@ -14,10 +14,16 @@ import time
 from .file_ia import FileIA
 from .ollama import OllamaIndisponible, OllamaSilence, DELAI_SILENCE, chat_flux, lister_modeles
 from .sauvegarde import PartieIntrouvable
+from . import aides as a
 from . import tour as t
 
 journal = logging.getLogger("pax.tour")
 MSG_PC = "Le PC de l'IA ne répond pas."
+
+
+def message_attente(n: int) -> str:
+    return (f"en attente, {n} demande{'s' if n > 1 else ''} avant vous" if n
+            else "en attente, c'est bientôt votre tour")
 
 
 class Tour:
@@ -62,10 +68,36 @@ class Tour:
         if self.etat == "attente":
             n = file.devant(self.ticket)
             d["devant"] = n
-            d["message"] = (f"en attente, {n} demande{'s' if n > 1 else ''} avant vous" if n
-                            else "en attente, c'est bientôt votre tour")
+            d["message"] = message_attente(n)
         elif self.etat == "ecriture":
             d["message"] = ("l'IA reprend sa réponse…" if self.relance else "l'IA écrit…")
+        return d
+
+
+class Aide:
+    """Ce que la page sait d'une demande d'aide (rapport, conseiller, dirigeant) en cours ou finie."""
+
+    def __init__(self, ticket, genre: str, message: str, nation: str):
+        self.ticket, self.genre, self.message_joueur, self.nation = ticket, genre, message, nation
+        self.etat = "attente"           # attente | ecriture | termine | echec
+        self.message = ""
+        self.resultat: dict | None = None
+        self.debut = time.monotonic()
+        self.fin: float | None = None
+
+    @property
+    def actif(self) -> bool:
+        return self.etat in ("attente", "ecriture")
+
+    def decrire(self, file: FileIA) -> dict:
+        d = {"etat": self.etat, "genre": self.genre, "nation": self.nation, "message": self.message}
+        if self.etat == "attente":
+            n = file.devant(self.ticket)
+            d["devant"], d["message"] = n, message_attente(n)
+        elif self.etat == "ecriture":
+            d["message"] = "l'IA écrit…"
+        elif self.etat == "termine":
+            d["resultat"] = self.resultat
         return d
 
 
@@ -75,7 +107,8 @@ class Gestionnaire:
     def __init__(self):
         self.file = FileIA()
         self.tours: dict[tuple[str, str], Tour] = {}
-        self.verrou = threading.RLock()       # protège `tours` et les écritures de parties
+        self.aides: dict[tuple[str, str], Aide] = {}
+        self.verrou = threading.RLock()       # protège `tours`, `aides` et les écritures de parties
 
     def actif(self, user: str, pid: str) -> bool:
         with self.verrou:
@@ -113,6 +146,106 @@ class Gestionnaire:
             if not j.actif and initial:
                 return {"etat": "aucun"}
             return j.decrire(self.file)
+
+    # ------------------------------------------------------------ les aides
+    def aide_active(self, user: str, pid: str) -> bool:
+        with self.verrou:
+            j = self.aides.get((user, pid))
+            return bool(j and j.actif)
+
+    def lancer_aide(self, app, user: str, pid: str, genre: str, message: str, nation: str) -> Aide:
+        with self.verrou:
+            ticket = self.file.prendre()
+            job = Aide(ticket, genre, message, nation)
+            self.aides[(user, pid)] = job
+        fil = threading.Thread(target=self._executer_aide, args=(app, user, pid, job), daemon=True,
+                               name=f"aide-{pid}")
+        try:
+            fil.start()
+        except BaseException:
+            self.file.liberer(ticket)
+            with self.verrou:
+                self.aides.pop((user, pid), None)
+            raise
+        return job
+
+    def consulter_aide(self, user: str, pid: str, initial: bool = False) -> dict:
+        with self.verrou:
+            j = self.aides.get((user, pid))
+            if j is None:
+                return {"etat": "aucun"}
+            if not j.actif and (time.monotonic() - (j.fin or 0) > self.GARDE_APRES_FIN or initial):
+                del self.aides[(user, pid)]
+                return {"etat": "aucun"}
+            return j.decrire(self.file)
+
+    def _executer_aide(self, app, user: str, pid: str, job: Aide):
+        try:
+            self.file.attendre(job.ticket)
+            job.etat = "ecriture"
+            self._aide(app, user, pid, job)
+            job.etat = "termine"
+        except OllamaSilence as e:
+            job.etat, job.message = "echec", f"{e} La demande est abandonnée ; rien n'est perdu."
+        except OllamaIndisponible as e:
+            job.etat, job.message = "echec", f"{MSG_PC} {e} Rien n'est perdu."
+        except t.ContexteTropPetit as e:
+            job.etat, job.message = "echec", f"{e} Rien n'est perdu."
+        except _Inexploitable as e:
+            job.etat, job.message = "echec", (
+                "La réponse de l'IA est restée inexploitable, même après une relance ("
+                + "; ".join(e.args[0][:3]) + "). Rien n'est perdu : réessayez.")
+        except PartieIntrouvable:
+            job.etat, job.message = "echec", "Cette partie n'existe plus."
+        except Exception:
+            journal.exception("aide %s", pid)
+            job.etat, job.message = "echec", "Erreur inattendue dans le jeu. Rien n'est perdu."
+        finally:
+            job.fin = time.monotonic()
+            self.file.liberer(job.ticket)
+
+    def _aide(self, app, user: str, pid: str, job: Aide):
+        reg = app.state.reglages.lire()
+        delai = float(app.state.config.extras.get("delai_silence", DELAI_SILENCE))
+        lister_modeles(reg["ollama_adresse"], float(app.state.config.extras.get("delai_sonde", 5.0)))
+        with self.verrou:
+            etat = app.state.sauvegarde.lire(user, pid)       # lu au tour de la demande : état à jour
+        if t.partie_terminee(etat):
+            raise _Inexploitable(["la partie est terminée"])
+        if job.nation and (job.nation not in etat["nations"] or t.est_disparue(etat, job.nation)):
+            raise _Inexploitable(["cette nation a disparu"])
+        messages, _ = a.construire_aide(etat, app.state.carte.noms, job.genre, reg["contexte"],
+                                        job.message_joueur, job.nation)
+        if job.genre == "rapport":
+            schema, lire = a.schema_rapport(), a.lire_rapport
+        else:
+            schema, lire = a.schema_reponse(), a.lire_conversation
+        texte = chat_flux(reg["ollama_adresse"], reg["modele"], messages, schema, reg["contexte"], delai,
+                          None, max_jetons=4096)
+        res, fautes = lire(texte)
+        if fautes:                                           # une seule relance, qui liste les fautes
+            suite = messages + [{"role": "assistant", "content": texte[:4000]},
+                                {"role": "user", "content": a.message_relance(fautes)}]
+            if t.estimer_jetons(suite) > reg["contexte"] - t.RESERVE_REPONSE:
+                suite = messages + [{"role": "user", "content": a.message_relance(fautes)}]
+            texte = chat_flux(reg["ollama_adresse"], reg["modele"], suite, schema, reg["contexte"], delai,
+                              None, max_jetons=4096)
+            res, fautes = lire(texte)
+            if fautes:
+                raise _Inexploitable(fautes)
+        with self.verrou:                                    # état relu sous verrou : un tour fini n'est jamais écrasé
+            etat = app.state.sauvegarde.lire(user, pid)
+            if job.genre == "rapport":
+                etat["rapport"] = {**res, "tour": etat["tour"], "date": etat["date"]}
+                job.resultat = {"rapport": etat["rapport"]}
+            elif job.genre == "conseiller":
+                etat["conseiller"] = a.ajouter_messages(etat.get("conseiller"), etat, job.message_joueur, res, "conseiller")
+                job.resultat = {"reponse": res}
+            else:
+                dip = etat.setdefault("diplomatie", {})
+                dip[job.nation] = a.ajouter_messages(dip.get(job.nation), etat, job.message_joueur, res, "dirigeant")
+                job.resultat = {"reponse": res, "nation": job.nation}
+            app.state.sauvegarde.enregistrer(user, etat)
 
     # ------------------------------------------------------------ le fil
     def _executer(self, app, user: str, pid: str, job: Tour):
@@ -171,6 +304,8 @@ class Gestionnaire:
             avant = copy.deepcopy(etat)
             avant.pop("historique", None)
             avant["brouillon"] = None
+            avant.pop("conseiller", None)        # les conversations ne se défont pas : elles restent
+            avant.pop("diplomatie", None)
             neuf["historique"] = (etat.get("historique") or []) + [avant]
             neuf["historique"] = neuf["historique"][-t.HISTORIQUE_MAX:]
             app.state.sauvegarde.enregistrer(user, neuf)
@@ -190,6 +325,9 @@ def annuler(app, user: str, pid: str) -> dict:
     with g.verrou:
         if g.actif(user, pid):
             raise TourEnCours("Attendez la fin du tour avant d'annuler.")
+        if g.aide_active(user, pid):
+            # sinon l'aide répondrait d'après le tour annulé et son texte resterait dans la partie
+            raise TourEnCours("Attendez la réponse de l'IA avant d'annuler.")
         etat = app.state.sauvegarde.lire(user, pid)
         hist = etat.get("historique") or []
         if not hist:
@@ -197,6 +335,8 @@ def annuler(app, user: str, pid: str) -> dict:
         ancien = hist[-1]
         dernier = etat.get("dernier_tour") or {}
         ancien["historique"] = hist[:-1]
+        ancien["conseiller"] = etat.get("conseiller") or []        # ce qui a été dit reste dit
+        ancien["diplomatie"] = etat.get("diplomatie") or {}
         ancien["brouillon"] = {"ordres": dernier.get("ordres", []), "duree": dernier.get("duree", t.DUREE_DEFAUT)}
         app.state.sauvegarde.enregistrer(user, ancien)
         return ancien
