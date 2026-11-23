@@ -108,8 +108,18 @@
       <label for="diplo-nation">Parler au dirigeant de</label>
       <select id="diplo-nation">
         <option value="">— choisir une nation —</option>
+        {% if not fin %}<option value="conf:nouvelle">+ Nouvelle conférence…</option>{% endif %}
         {% for n in interlocuteurs %}<option value="{{ n.id }}">{{ n.nom }}{% if n.dirigeant %} — {{ n.dirigeant }}{% endif %}</option>{% endfor %}
       </select>
+      <fieldset id="conf-nouvelle" class="conf-choix" hidden>
+        <legend>Réunir de 2 à {{ donnees_aides.max_conference }} nations</legend>
+        <div id="conf-cases"></div>
+      </fieldset>
+      <div id="conf-inviter" class="conf-inviter" hidden>
+        <select id="conf-inviter-nation" aria-label="Nation à inviter"></select>
+        <button type="button" class="btn" id="conf-inviter-bouton">+ inviter</button>
+      </div>
+      <p class="alerte" id="conf-faute" hidden></p>
       <div class="conversation" id="conv-diplomatie" aria-live="polite"></div>
       {% if not fin %}
       <p class="aide-statut progression" id="diplomatie-statut" hidden aria-live="polite"></p>

@@ -125,3 +125,11 @@ label { display: block; margin: 1rem 0 .25rem; font-weight: 600; }
 #rapport ul { padding-left: 1.1rem; margin: .2rem 0; }
 #rapport .suggestion { display: flex; gap: .5rem; align-items: flex-start; margin: .3rem 0; }
 .volet select, .volet #conseiller-texte, .volet #diplomatie-texte { width: 100%; box-sizing: border-box; margin: .3rem 0; }
+
+/* conférences diplomatiques */
+.conf-choix { margin: .4rem 0; padding: .4rem .6rem; border: 1px solid var(--bord); border-radius: 8px; }
+.conf-choix label { display: block; margin: .15rem 0; }
+.conf-inviter { display: flex; gap: .5rem; align-items: center; margin: .3rem 0; }
+.conf-inviter select { flex: 1; }
+
+.conf-inviter[hidden] { display: none; }

@@ -110,8 +110,11 @@ class Tour:
 class Aide:
     """Ce que la page sait d'une demande d'aide (rapport, conseiller, dirigeant) en cours ou finie."""
 
-    def __init__(self, ticket, genre: str, message: str, nation: str):
+    def __init__(self, ticket, genre: str, message: str, nation: str, conference: str = "",
+                 nations: list[str] | None = None):
         self.ticket, self.genre, self.message_joueur, self.nation = ticket, genre, message, nation
+        self.conference = conference            # id de la conférence (nouvelle ou existante)
+        self.nations = list(nations or [])      # invités d'une conférence à créer
         self.etat = "attente"           # attente | ecriture | termine | echec
         self.message = ""
         self.resultat: dict | None = None
@@ -186,10 +189,11 @@ class Gestionnaire:
             j = self.aides.get((user, pid))
             return bool(j and j.actif)
 
-    def lancer_aide(self, app, user: str, pid: str, genre: str, message: str, nation: str) -> Aide:
+    def lancer_aide(self, app, user: str, pid: str, genre: str, message: str, nation: str,
+                    conference: str = "", nations: list[str] | None = None) -> Aide:
         with self.verrou:
             ticket = self.file.prendre()
-            job = Aide(ticket, genre, message, nation)
+            job = Aide(ticket, genre, message, nation, conference, nations)
             self.aides[(user, pid)] = job
         fil = threading.Thread(target=self._executer_aide, args=(app, user, pid, job), daemon=True,
                                name=f"aide-{pid}")
@@ -247,9 +251,20 @@ class Gestionnaire:
             raise _Inexploitable(["la partie est terminée"])
         if job.nation and (job.nation not in etat["nations"] or t.est_disparue(etat, job.nation)):
             raise _Inexploitable(["cette nation a disparu"])
+        invites: list[str] = []
+        if job.genre == "conference":
+            existante = a.trouver_conference(etat, job.conference)
+            tous = list(existante["nations"]) if existante else job.nations
+            invites = [i for i in tous if i in etat["nations"] and not t.est_disparue(etat, i)]
+            if not invites:
+                raise _Inexploitable(["tous les invités ont disparu"])
         messages, _ = a.construire_aide(etat, app.state.carte.noms, job.genre, reg["contexte"],
-                                        job.message_joueur, job.nation)
-        if job.genre == "rapport":
+                                        job.message_joueur, job.nation, invites, job.conference)
+        if job.genre == "conference":
+            noms = [(i, etat["nations"][i]["nom"]) for i in invites]
+            schema = a.schema_conference(invites)
+            lire = lambda texte: _lire_conf(texte, noms)
+        elif job.genre == "rapport":
             schema, lire = a.schema_rapport(), a.lire_rapport
         else:
             schema, lire = a.schema_reponse(), a.lire_conversation
@@ -271,6 +286,16 @@ class Gestionnaire:
             if job.genre == "rapport":
                 etat["rapport"] = {**res, "tour": etat["tour"], "date": etat["date"]}
                 job.resultat = {"rapport": etat["rapport"]}
+            elif job.genre == "conference":
+                reponses, manquants = res
+                conf = a.trouver_conference(etat, job.conference)
+                nouvelle = conf is None
+                if nouvelle:                                 # créée seulement si l'IA a répondu : rien d'orphelin
+                    conf = {"id": job.conference, "nations": list(job.nations), "messages": []}
+                    etat.setdefault("conferences", []).append(conf)
+                a.ajouter_a_conference(conf, etat, job.message_joueur, reponses)
+                job.resultat = {"conference": conf["id"], "nations": list(conf["nations"]), "nouvelle": nouvelle,
+                                "reponses": reponses, "manquants": manquants}
             elif job.genre == "conseiller":
                 etat["conseiller"] = a.ajouter_messages(etat.get("conseiller"), etat, job.message_joueur, res, "conseiller")
                 job.resultat = {"reponse": res}
@@ -346,9 +371,16 @@ class Gestionnaire:
             avant["brouillon"] = None
             avant.pop("conseiller", None)        # les conversations ne se défont pas : elles restent
             avant.pop("diplomatie", None)
+            avant.pop("conferences", None)
             neuf["historique"] = (etat.get("historique") or []) + [avant]
             neuf["historique"] = neuf["historique"][-t.HISTORIQUE_MAX:]
             app.state.sauvegarde.enregistrer(user, neuf)
+
+
+def _lire_conf(texte: str, noms: list[tuple[str, str]]):
+    """Adapte a.lire_conference au schéma (résultat, fautes) des autres aides."""
+    reponses, manquants, fautes = a.lire_conference(texte, noms)
+    return ((reponses, manquants) if not fautes else None), fautes
 
 
 class _Inexploitable(Exception):
@@ -377,6 +409,8 @@ def annuler(app, user: str, pid: str) -> dict:
         ancien["historique"] = hist[:-1]
         ancien["conseiller"] = etat.get("conseiller") or []        # ce qui a été dit reste dit
         ancien["diplomatie"] = etat.get("diplomatie") or {}
+        if etat.get("conferences"):
+            ancien["conferences"] = etat["conferences"]
         ancien["brouillon"] = {"ordres": dernier.get("ordres", []), "duree": dernier.get("duree", t.DUREE_DEFAUT)}
         app.state.sauvegarde.enregistrer(user, ancien)
         return ancien
