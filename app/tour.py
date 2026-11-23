@@ -200,7 +200,14 @@ une guerre déclarée apparaît dans « guerres » (action « déclaration »), 
 « territoires », un rapprochement ou une crise dans « relations », un effort ou une perte dans \
 « chiffres ». Un ordre « réussi » ou « partiel » change au moins un chiffre ou une relation. \
 Ne laisse ces listes vides que s'il ne s'est vraiment rien passé.
-- Ne raconte pas de nouveau un événement des tours précédents (il est déjà dans l'histoire).
+- Ne raconte pas de nouveau un événement des tours précédents (il est déjà dans l'histoire). \
+- Les « règles de simulation » datées dans la période du tour se produisent, avec leurs \
+conséquences dans les listes (une invasion : « guerres » et « territoires »), sauf si les ordres \
+du joueur ou la situation les ont rendues impossibles ; dis-le alors dans un événement.
+- Une guerre en cours n'est pas figée : selon la durée du tour et le rapport de forces (armée, \
+alliés), le front bouge et des territoires changent de mains (base « guerre »), dans la limite \
+des plafonds. Un pays submergé peut perdre tous ses territoires.
+- « nom » d'une guerre déclarée : un nom court comme « Guerre franco-allemande ».
 - Les variations de chiffres et de relations doivent rester modestes et respecter les plafonds donnés.
 - Un territoire ne change de mains que par une guerre en cours (« guerre »), un traité ou une \
 annexion décrits dans un événement du même tour (« traité », « annexion »), ou une indépendance \
