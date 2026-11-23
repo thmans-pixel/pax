@@ -72,7 +72,8 @@ DELAI_SILENCE = 600.0   # 10 minutes sans RIEN recevoir (pas 10 minutes au total
 
 
 def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | None, num_ctx: int,
-              delai_silence: float = DELAI_SILENCE, sur_texte=None, max_jetons: int = 8192) -> str:
+              delai_silence: float = DELAI_SILENCE, sur_texte=None, max_jetons: int = 8192,
+              reflexion: bool = False) -> str:
     """Une conversation en flux (POST /api/chat) ; renvoie le texte complet de la réponse.
 
     `format` = schéma JSON, `options.num_ctx` = taille de contexte. Le délai est celui d'UNE lecture
@@ -85,6 +86,10 @@ def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | No
              "options": {"num_ctx": int(num_ctx), "num_predict": int(max_jetons), "temperature": 0.7}}
     if schema is not None:
         corps["format"] = schema
+    if not reflexion:
+        # Gemma 4, Qwen 3… « réfléchissent » d'abord (champ message.thinking) : des milliers de
+        # jetons, un tour 3 fois plus long et des réponses tronquées (constaté sur thnas).
+        corps["think"] = False
     req = urllib.request.Request(
         base + "/api/chat", data=json.dumps(corps).encode("utf-8"), method="POST",
         headers={"Content-Type": "application/json", "Accept": "application/x-ndjson"})
@@ -107,6 +112,9 @@ def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | No
                     raise OllamaIndisponible(f"Ollama signale une erreur : {obj['error']}")
                 msg = obj.get("message") or {}
                 morceau = (msg.get("content") or "") if isinstance(msg, dict) else ""
+                pensee = (msg.get("thinking") or "") if isinstance(msg, dict) else ""
+                if pensee and sur_texte is not None:
+                    sur_texte(pensee)                  # compte dans la progression, pas dans la réponse
                 if morceau:
                     morceaux.append(morceau)
                     if sur_texte is not None:
@@ -118,6 +126,9 @@ def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | No
             detail = json.loads(e.read(2000)).get("error", "")
         except (ValueError, AttributeError, OSError):
             detail = ""
+        if e.code == 400 and "think" in str(detail).lower() and not reflexion:
+            # vieil Ollama ou modèle qui refuse le réglage : on redemande sans lui
+            return _sans_reflexion(adresse, modele, messages, schema, num_ctx, delai_silence, sur_texte, max_jetons)
         raise OllamaIndisponible(
             f"{base} répond « {e.code} »" + (f" : {detail}" if detail else "")
             + ". Le modèle choisi est-il installé sur le PC de l'IA ?") from None
@@ -131,3 +142,8 @@ def chat_flux(adresse: str, modele: str, messages: list[dict], schema: dict | No
     except (OSError, http.client.HTTPException):
         raise OllamaIndisponible(f"La connexion avec {base} s'est interrompue.") from None
     return "".join(morceaux)
+
+
+def _sans_reflexion(adresse, modele, messages, schema, num_ctx, delai_silence, sur_texte, max_jetons) -> str:
+    return chat_flux(adresse, modele, messages, schema, num_ctx, delai_silence, sur_texte, max_jetons,
+                     reflexion=True)

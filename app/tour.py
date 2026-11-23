@@ -209,21 +209,20 @@ une guerre déclarée apparaît dans « guerres » (action « déclaration »), 
 « territoires », un rapprochement ou une crise dans « relations », un effort ou une perte dans \
 « chiffres ». Un ordre « réussi » ou « partiel » change au moins un chiffre ou une relation. \
 Ne laisse ces listes vides que s'il ne s'est vraiment rien passé.
-- Ne raconte pas de nouveau un événement des tours précédents (il est déjà dans l'histoire). \
+- Ne raconte pas de nouveau un événement des tours précédents (il est déjà dans l'histoire).
 - Les « règles de simulation » datées dans la période du tour se produisent, avec leurs \
 conséquences dans les listes (une invasion : « guerres » et « territoires »), sauf si les ordres \
 du joueur ou la situation les ont rendues impossibles ; dis-le alors dans un événement.
 - « fronts » est OBLIGATOIRE : une entrée par guerre de « Guerres en cours » (nom exact) : « avance » \
 (« a », « b » ou « aucun »), « par » (nation du camp qui avance qui reçoit les territoires), \
 « territoires_pris » (codes tenus par le camp qui recule) et « explication ». Le front bouge selon la \
-durée et le rapport de forces, dans la limite des plafonds ; un pays submergé peut tout perdre. \
+durée et le rapport de forces, dans la limite des plafonds ; le dernier territoire d'une nation ne tombe que face à une armée double de la sienne. \
 Les fronts reflètent les règles datées de « Ce tour ».
 - Tout effort a un coût : plus d'armée se paie en économie ou stabilité ; une guerre use l'économie \
 et la stabilité des deux camps ; un succès n'augmente pas tout à la fois. La hausse totale des chiffres \
 d'une nation ne dépasse pas le plafond d'un chiffre ; au-dessus de 90, une hausse est divisée par deux.
 - Une paix doit être racontée par un événement du tour citant les deux camps dans « pays ».
 - « nom » d'une guerre déclarée : un nom court comme « Guerre franco-allemande ».
-- Les variations de chiffres et de relations doivent rester modestes et respecter les plafonds donnés.
 - Un territoire ne change de mains que par une guerre en cours (« guerre »), un traité ou une \
 annexion décrits dans un événement du même tour (« traité », « annexion »), ou une indépendance \
 (« indépendance », avec « nouvelle_nation », une seule par tour). Les événements qui impliquent \
@@ -779,6 +778,10 @@ class Application:
                     nom_ancien = self.etat["nations"][ancien]["nom"]
                     self.corr(f"{ctx} refusé : il appartient à {nom_ancien}, qui n'est pas dans le camp qui recule.", prive)
                     continue
+                pourquoi = self.conquete_totale_refusee(ancien, vivants)
+                if pourquoi:
+                    self.corr(f"{ctx} refusé : {pourquoi}", prive)
+                    continue
                 if self.transferer(terr, par, ctx, prive):
                     pris.append(terr)
             resultats.append({"guerre": g["nom"], "avance": av, "territoires_pris": pris, "explication": explication})
@@ -787,6 +790,20 @@ class Application:
                 self.corr(f"Guerre « {_cite(g['nom'])} » : absente de « fronts » (une entrée par guerre en cours est obligatoire), front figé.",
                           not self.implique_joueur(*g["camp_a"], *g["camp_b"]))
         return resultats
+
+    def conquete_totale_refusee(self, victime: str, attaquants: list[str]) -> str | None:
+        """Une nation ne perd son DERNIER territoire que submergée : armées des attaquants au moins
+        double de la sienne. Sinon un pays d'un seul territoire (Chine, Pologne…) tombait d'un coup
+        (constaté sur thnas : la Chine prise en un mois)."""
+        if len(territoires_de(self.etat, victime)) > 1:
+            return None
+        force = sum(self.etat["nations"][n]["armee"] for n in attaquants if n in self.etat["nations"])
+        defense = self.etat["nations"][victime]["armee"]
+        if force >= 2 * defense:
+            return None
+        nom = self.etat["nations"][victime]["nom"]
+        return (f"c'est le dernier territoire de {nom}, qui ne peut être conquise que par des armées au moins "
+                f"deux fois plus fortes (attaque {force}, défense {defense}) ; le front avance sans conquête totale.")
 
     def transferer(self, terr: str, dest: str, ctx: str, prive: bool) -> bool:
         """Applique un transfert déjà validé, dans la limite du plafond du tour (partagé par tous les chemins)."""
@@ -844,6 +861,11 @@ class Application:
             if base.startswith("guerre"):
                 ok = en_guerre(self.etat, ancien, dest)
                 pourquoi = f"{nom_ancien} et {nom_dest} ne sont pas en guerre"
+                if ok:
+                    camp = {n for w in self.etat["guerres"] for c, o in ((w["camp_a"], w["camp_b"]), (w["camp_b"], w["camp_a"]))
+                            if dest in c and ancien in o for n in c if not est_disparue(self.etat, n)}
+                    refus = self.conquete_totale_refusee(ancien, sorted(camp) or [dest])
+                    ok, pourquoi = (False, refus.rstrip(".")) if refus else (True, pourquoi)
             elif base.startswith(("traite", "annex")):
                 ok = any(ancien in e["pays"] and dest in e["pays"] for e in evenements)
                 pourquoi = f"aucun événement du tour ne décrit le traité ou l'annexion entre {nom_ancien} et {nom_dest}"
