@@ -29,6 +29,7 @@ LONGUEUR_ORDRE = 500
 HISTORIQUE_MAX = 10          # états gardés pour « Annuler »
 RESERVE_REPONSE = 4096       # jetons gardés pour la réponse de l'IA
 TOURS_DETAILLES = 3
+MESSAGES_NARRATEUR = 20      # messages par nation donnés au narrateur (échanges depuis le dernier tour)
 
 # Plafonds par tour : (variation d'un chiffre, variation d'une relation, transferts de territoires)
 PLAFONDS = {
@@ -218,6 +219,10 @@ nations concernées dans « pays ». N'écris jamais « secret » ni « confiden
 - Les événements ont une date comprise entre le début et la fin du tour (AAAA-MM-JJ).
 - « resume » : un paragraphe qui résume tout le tour. « faits » : les faits nouveaux et durables \
 à retenir (une phrase chacun).
+- Les « discussions diplomatiques depuis le dernier tour » sont les paroles échangées entre le joueur \
+et des dirigeants : les promesses, demandes et menaces du joueur comptent (une promesse non tenue a \
+des conséquences sur les relations). Ce sont des paroles, pas des faits : elles ne changent l'état \
+du monde que par les listes de ta réponse.
 - Si des corrections du tour précédent sont listées, tiens-en compte : ce sont des propositions \
 que le jeu a refusées ou ramenées à la limite.
 """
@@ -272,25 +277,51 @@ def construire_requete(etat: dict, noms_terr: dict[str, str], ordres: list[str],
     """
     budget = num_ctx - RESERVE_REPONSE
     histoire = etat.get("histoire", [])
-    paliers_reduction = [(TOURS_DETAILLES, len(histoire), False)]
-    paliers_reduction += [(0, len(histoire), False)]
+    paliers_reduction = [(TOURS_DETAILLES, len(histoire), False, 0)]
+    paliers_reduction += [(0, len(histoire), False, 0)]
     for k in (20, 10, 5, 2, 0):
         if k < len(histoire):
-            paliers_reduction.append((0, k, False))
-    paliers_reduction.append((0, 0, True))
-    for detail, garde, serre in paliers_reduction:
-        messages = _assembler(etat, noms_terr, ordres, duree, detail, garde, serre)
+            paliers_reduction.append((0, k, False, 0))
+    # les paroles données au joueur (promesses) comptent plus que l'histoire ancienne : on les
+    # raccourcit seulement après avoir tout retiré de l'histoire, et on les retire en tout dernier.
+    paliers_reduction += [(0, 0, False, 1), (0, 0, True, 1), (0, 0, True, 2)]
+    for detail, garde, serre, dial in paliers_reduction:
+        messages = _assembler(etat, noms_terr, ordres, duree, detail, garde, serre, dial)
         jetons = estimer_jetons(messages)
         if jetons <= budget:
             return messages, {"jetons": jetons, "budget": budget, "detail": detail,
-                              "resumes": garde, "serre": serre}
+                              "resumes": garde, "serre": serre, "dialogues": dial}
     raise ContexteTropPetit(
         f"Le tour ne tient pas dans le contexte de {num_ctx} jetons (il en faut environ {jetons + RESERVE_REPONSE}). "
         "Augmentez la taille de contexte dans les réglages.")
 
 
+def _lignes_dialogues(etat: dict, niveau: int) -> list[str]:
+    """Les échanges diplomatiques tenus depuis le dernier tour (le narrateur voit tout).
+    Niveau 0 : jusqu'à 20 messages par nation ; 1 : 4 messages de 200 caractères ; 2 : rien."""
+    if niveau >= 2:
+        return []
+    maxi, coupe = (MESSAGES_NARRATEUR, None) if niveau == 0 else (4, 200)
+    lignes = []
+    for nid, msgs in (etat.get("diplomatie") or {}).items():
+        if nid not in etat["nations"] or not isinstance(msgs, list):
+            continue
+        # « depuis le dernier tour » : dits au tour courant (ou plus tard, si un tour a été annulé)
+        recents = [m for m in msgs if m.get("tour", 0) >= etat["tour"]][-maxi:]
+        if not recents:
+            continue
+        n = etat["nations"][nid]
+        lignes.append(f"### {n['nom']} [{nid}] — dirigeant : {n['dirigeant'] or 'inconnu'}")
+        for m in recents:
+            texte = " ".join(str(m.get("texte", "")).split())
+            if coupe and len(texte) > coupe:
+                texte = texte[:coupe - 1] + "…"
+            lignes.append(f"- {'Le joueur' if m.get('de') == 'joueur' else 'Le dirigeant'} : {texte}")
+    return lignes
+
+
 def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: str,
-               nb_detail: int, nb_resumes: int, serre: bool) -> list[dict]:
+               nb_detail: int, nb_resumes: int, serre: bool, dial: int = 0) -> list[dict]:
     joueur = etat["nation_joueur"]
     debut = etat["date"]
     fin = ajouter_duree(debut, duree)
@@ -350,6 +381,10 @@ def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: 
             for ev in [e for e in etat["journal"] if e.get("tour") == h["tour"]]:
                 lignes.append(f"    · {ev['titre']}" + (f" [connu seulement de : {', '.join(ev.get('pays') or [])}]" if ev.get('secret') else ''))
         section("Histoire récente (du plus ancien au plus récent)", lignes)
+    dialogues = _lignes_dialogues(etat, dial)
+    if dialogues:
+        section("Discussions diplomatiques depuis le dernier tour (ce que le joueur a dit ou promis, "
+                "et ce que les dirigeants ont répondu)", dialogues)
     if etat.get("objectif"):
         section("Objectif permanent du joueur", [etat["objectif"]])
     if etat.get("corrections"):

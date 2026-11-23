@@ -147,13 +147,13 @@ Chacun se vérifie par un test automatique ou par une manipulation précise.
 18. [x] L'onglet État affiche sans IA : date, tour, chiffres de la nation et leur évolution
    depuis le début, relations classées, guerres en cours, derniers événements.
    — *Vérification :* test du rendu.
-19. [ ] Le bouton « Rapport de situation » renvoie : la situation en quelques lignes, les
+19. [x] Le bouton « Rapport de situation » renvoie : la situation en quelques lignes, les
    menaces, les occasions et 3 suggestions d'ordres ; un clic sur une suggestion l'ajoute aux
    ordres. — *Vérification :* test (lecture de la réponse) + manipulation.
-20. [ ] Le Conseiller répond en français à partir de l'état de la nation, de ce qu'elle sait
+20. [x] Le Conseiller répond en français à partir de l'état de la nation, de ce qu'elle sait
    du monde et de l'objectif du joueur ; la conversation est gardée dans la sauvegarde.
    — *Vérification :* test du contenu envoyé + manipulation.
-21. [ ] En Diplomatie, on discute avec le dirigeant d'une nation ; il ne reçoit ni les
+21. [x] En Diplomatie, on discute avec le dirigeant d'une nation ; il ne reçoit ni les
    échanges avec d'autres nations ni ceux du conseiller ; ce qui s'est dit depuis le dernier
    tour est transmis au narrateur du tour suivant (une promesse compte).
    — *Vérification :* test du contenu des requêtes.
@@ -371,3 +371,37 @@ rapport de situation et les dirigeants arriveront. Les corrections sont gardées
 - Un tour avec le vrai modèle : la qualité du JSON produit, le temps, la pertinence des corrections.
 - Essai réel PC éteint (critère 16 ter) : message « Le PC de l'IA ne répond pas ».
 - La mise à jour du paquet YunoHost en 0.2.0 (`yunohost app upgrade`), jamais exécutée ici.
+
+## Livraison — étape 3 (les aides)
+
+**Fait** : bouton « Rapport de situation » (situation, menaces, occasions, 3 ordres suggérés ; un clic sur
+« + ajouter » place l'ordre dans la zone, le dernier rapport est gardé dans la sauvegarde), onglet Conseiller
+(conversation française, gardée dans `etat["conseiller"]`), onglet Diplomatie (choix d'une nation non disparue,
+conversation par nation dans `etat["diplomatie"]`), section « Discussions diplomatiques depuis le dernier
+tour » dans la requête du narrateur. Version 0.3.0. Critères cochés : 19, 20, 21 et 16 (complété) ; 94 tests
+`pytest` verts (19 nouveaux, sans Ollama).
+
+**Choix de réalisation**
+- Nouveau module `app/aides.py` (contexte, schémas, lecture) ; l'exécution réutilise le même schéma que le tour :
+  fil d'exécution, file unique (même message « en attente, N demande(s) avant vous », même « Le PC de l'IA ne
+  répond pas »), sonde de 5 s, lecture tolérante, une relance. Routes `POST /partie/<id>/aide` et
+  `GET /partie/<id>/aide`. Une seule aide à la fois par partie ; le joueur envoie au plus 1 000 caractères.
+- **Qui sait quoi** : conseiller et rapport reçoivent `evenements_visibles()`, la fiche du joueur, les fiches
+  publiques des puissances en vue, ses relations, les guerres, l'objectif (pas le rapport) ; JAMAIS
+  `histoire[].resume`, `faits_etablis`, `corrections`, ni le contexte et les règles du scénario. Un dirigeant
+  reçoit sa nation, sa relation avec le joueur, ses guerres, les événements publics (et les secrets qu'il partage
+  avec le joueur) et SA conversation (20 derniers messages) ; ni l'objectif, ni le conseiller, ni les autres
+  conversations. Aucun identifiant de joueur.
+- Écriture : l'état est lu au tour de la demande, puis RELU sous verrou avant d'ajouter l'échange : un tour ou une
+  annulation n'est jamais écrasé. Les conversations sont retirées des 10 états d'annulation et conservées par
+  « Annuler » (ce qui a été dit reste dit). Historique gardé : 60 messages par conversation.
+- « Depuis le dernier tour » = messages dont `tour` >= tour courant. Dans le budget de contexte, les échanges
+  sont raccourcis (4 messages de 200 caractères) seulement après avoir retiré toute l'histoire ancienne, et
+  retirés en tout dernier ; ordres, état du joueur et règles ne sont jamais retirés.
+- Les dirigeants ne voient pas les chiffres du joueur ; le conseiller ne connaît que ce que la carte montre déjà
+  (fiches publiques), pas les relations entre autres nations.
+
+**À vérifier à la main (non testable ici)**
+- Le JavaScript (onglets, clic sur une suggestion, conversation, statut d'attente) dans un vrai navigateur.
+- La qualité des réponses du vrai modèle : JSON respecté, ton des dirigeants, suggestions utilisables ; durée.
+- Essai réel PC éteint pour les aides ; mise à jour du paquet YunoHost en 0.3.0.

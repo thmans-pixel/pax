@@ -20,6 +20,8 @@
     <div class="onglets" role="tablist">
       <button type="button" data-onglet="ordres" class="actif">Ordres</button>
       <button type="button" data-onglet="journal">Journal</button>
+      <button type="button" data-onglet="conseiller">Conseiller</button>
+      <button type="button" data-onglet="diplomatie">Diplomatie</button>
       <button type="button" data-onglet="etat">État</button>
     </div>
     {% if fin %}
@@ -56,6 +58,12 @@
       </div>
       {% endif %}
       {% if not fin %}
+      <div class="rapport-zone" id="zone-rapport" data-longueur="{{ longueur_ordre }}">
+        {{ bouton_ia("Rapport de situation", id="rapport-bouton") }}
+        <p class="aide-statut progression" id="rapport-statut" hidden aria-live="polite"></p>
+        <p class="alerte" id="rapport-faute" hidden></p>
+        <div id="rapport" hidden></div>
+      </div>
       <h3>Vos ordres</h3>
       <ol id="liste-ordres" data-max="{{ max_ordres }}" data-longueur="{{ longueur_ordre }}">
         {% for o in ordres_saisis %}
@@ -84,6 +92,31 @@
       {% endfor %}
       {% endfor %}
       {% else %}<p class="discret">Le journal est vide : il se remplit à chaque tour.</p>{% endif %}
+    </div>
+    <div class="volet" data-volet="conseiller" hidden>
+      <p class="discret">Votre conseiller connaît l'état de votre nation, ce qu'elle sait du monde et votre objectif. La conversation est gardée avec la partie.</p>
+      <div class="conversation" id="conv-conseiller" aria-live="polite"></div>
+      {% if not fin %}
+      <p class="aide-statut progression" id="conseiller-statut" hidden aria-live="polite"></p>
+      <p class="alerte" id="conseiller-faute" hidden></p>
+      <textarea id="conseiller-texte" rows="3" maxlength="{{ longueur_message }}" placeholder="Posez votre question…"></textarea>
+      {{ bouton_ia("Envoyer", id="conseiller-envoyer") }}
+      {% endif %}
+    </div>
+    <div class="volet" data-volet="diplomatie" hidden>
+      <p class="discret">Ce que vous dites à un dirigeant n'est su que de lui ; l'histoire en tiendra compte au prochain tour (une promesse compte).</p>
+      <label for="diplo-nation">Parler au dirigeant de</label>
+      <select id="diplo-nation">
+        <option value="">— choisir une nation —</option>
+        {% for n in interlocuteurs %}<option value="{{ n.id }}">{{ n.nom }}{% if n.dirigeant %} — {{ n.dirigeant }}{% endif %}</option>{% endfor %}
+      </select>
+      <div class="conversation" id="conv-diplomatie" aria-live="polite"></div>
+      {% if not fin %}
+      <p class="aide-statut progression" id="diplomatie-statut" hidden aria-live="polite"></p>
+      <p class="alerte" id="diplomatie-faute" hidden></p>
+      <textarea id="diplomatie-texte" rows="3" maxlength="{{ longueur_message }}" placeholder="Que lui dites-vous ?"></textarea>
+      {{ bouton_ia("Envoyer", id="diplomatie-envoyer") }}
+      {% endif %}
     </div>
     <div class="etat volet" data-volet="etat" hidden>
       <p>
@@ -145,6 +178,8 @@
   <section id="fiche" class="fiche fiche-bas"><p class="discret">Cliquez sur un pays pour voir sa nation.</p></section>
 </div>
 <script type="application/json" id="pax-data">{{ data|tojson }}</script>
+<script type="application/json" id="pax-aides">{{ donnees_aides|tojson }}</script>
 {% endblock %}
 {% block scripts %}<script src="{{ u('/static/carte.js') }}" defer></script>
-<script src="{{ u('/static/tour.js') }}" defer></script>{% endblock %}
+<script src="{{ u('/static/tour.js') }}" defer></script>
+<script src="{{ u('/static/aides.js') }}" defer></script>{% endblock %}

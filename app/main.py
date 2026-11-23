@@ -24,8 +24,8 @@ from starlette.templating import Jinja2Templates
 from . import __version__
 from .carte import Carte
 from .config import Config
-from . import execution, tour as moteur
-from .monde import etat_initial, evenements_visibles, fiche_nation, resume_etat, date_fr, PALIERS, LIBELLES_CHIFFRES
+from . import aides, execution, tour as moteur
+from .monde import est_disparue, etat_initial, evenements_visibles, fiche_nation, resume_etat, date_fr, PALIERS, LIBELLES_CHIFFRES
 from .ollama import OllamaIndisponible, lister_modeles, normaliser_adresse
 from .reglages import Reglages
 from .sauvegarde import PartieIntrouvable, Sauvegarde, UTILISATEUR
@@ -189,6 +189,14 @@ async def partie(request: Request):
     for e in reversed(visibles):
         par_tour.setdefault(e["tour"], []).append({**e, "date_lisible": date_fr(e["date"])})
     brouillon = etat.get("brouillon") or {}
+    interlocuteurs = sorted(({"id": nid, "nom": n["nom"], "dirigeant": n["dirigeant"]}
+                             for nid, n in etat["nations"].items()
+                             if nid != etat["nation_joueur"] and not est_disparue(etat, nid)),
+                            key=lambda x: x["nom"].casefold())
+    dip = etat.get("diplomatie") or {}
+    donnees_aides = {"conseiller": etat.get("conseiller") or [],
+                     "diplomatie": {x["id"]: dip.get(x["id"]) or [] for x in interlocuteurs if dip.get(x["id"])},
+                     "rapport": etat.get("rapport")}
     return page(request, "partie.html", etat=etat, resume=resume_etat(etat, carte.noms),
                 svg=carte.svg(etat["territoires"], etat["nations"]), data=donnees_carte(carte, etat),
                 paliers=PALIERS, libelles=LIBELLES_CHIFFRES, durees=moteur.DUREES,
@@ -197,7 +205,8 @@ async def partie(request: Request):
                 duree_choisie=brouillon.get("duree") or (etat.get("dernier_tour") or {}).get("duree") or moteur.DUREE_DEFAUT,
                 dernier=etat.get("dernier_tour"), corrections=etat.get("corrections_joueur") or [],
                 peut_annuler=bool(etat.get("historique")), max_ordres=moteur.MAX_ORDRES,
-                longueur_ordre=moteur.LONGUEUR_ORDRE)
+                longueur_ordre=moteur.LONGUEUR_ORDRE, interlocuteurs=interlocuteurs,
+                donnees_aides=donnees_aides, longueur_message=aides.LONGUEUR_MESSAGE)
 
 
 @protege(ecriture=True)
@@ -233,6 +242,55 @@ async def lancer_tour(request: Request):
         app.state.sauvegarde.enregistrer(user, etat)
         tours.lancer(app, user, pid, ordres, duree)
     return JSONResponse({"ok": True}, status_code=202)
+
+
+@protege(ecriture=True)
+async def demander_aide(request: Request):
+    """Démarre une aide de l'IA (rapport, conseiller, dirigeant) ; suivi par GET /partie/<id>/aide."""
+    app = request.app
+    user, pid = request.state.user, request.path_params["pid"]
+    introuvable = JSONResponse({"ok": False, "message": "Cette partie n'existe pas ou n'est pas à vous."}, status_code=404)
+    try:
+        app.state.sauvegarde.lire(user, pid)
+    except PartieIntrouvable:
+        return introuvable
+    try:
+        donnees = await request.json()
+        genre = donnees.get("genre")
+        if genre not in aides.GENRES:
+            raise ValueError("Aide inconnue.")
+        message = aides.nettoyer_message(donnees.get("message")) if genre != "rapport" else ""
+        nation = donnees.get("nation") if genre == "diplomatie" else ""
+    except (ValueError, AttributeError) as e:
+        return JSONResponse({"ok": False, "message": str(e) or "Demande mal formée."}, status_code=400)
+    if not app.state.reglages.lire()["modele"]:
+        return JSONResponse({"ok": False, "message": "Aucun modèle n'est choisi dans les réglages."}, status_code=409)
+    tours: execution.Gestionnaire = app.state.tours
+    with tours.verrou:
+        if tours.aide_active(user, pid):
+            return JSONResponse({"ok": False, "message": "Une demande à l'IA est déjà en cours pour cette partie."}, status_code=409)
+        try:
+            etat = app.state.sauvegarde.lire(user, pid)
+        except PartieIntrouvable:
+            return introuvable
+        if moteur.partie_terminee(etat):
+            return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
+        if genre == "diplomatie" and not (isinstance(nation, str) and nation in etat["nations"]
+                                          and nation != etat["nation_joueur"] and not est_disparue(etat, nation)):
+            return JSONResponse({"ok": False, "message": "Choisissez une nation qui existe encore."}, status_code=400)
+        tours.lancer_aide(app, user, pid, genre, message, nation or "")
+    return JSONResponse({"ok": True}, status_code=202)
+
+
+@protege()
+async def progression_aide(request: Request):
+    try:
+        request.app.state.sauvegarde.lire(request.state.user, request.path_params["pid"])
+    except PartieIntrouvable:
+        return JSONResponse({"etat": "aucun"}, status_code=404)
+    d = request.app.state.tours.consulter_aide(request.state.user, request.path_params["pid"],
+                                               initial=request.query_params.get("initial") == "1")
+    return JSONResponse(d, headers={"Cache-Control": "no-store"})
 
 
 @protege()
@@ -356,6 +414,8 @@ def creer_app(config: Config | None = None) -> Starlette:
         Route("/partie/{pid}", partie),
         Route("/partie/{pid}/tour", lancer_tour, methods=["POST"]),
         Route("/partie/{pid}/tour", progression_tour),
+        Route("/partie/{pid}/aide", demander_aide, methods=["POST"]),
+        Route("/partie/{pid}/aide", progression_aide),
         Route("/partie/{pid}/annuler", annuler_tour, methods=["POST"]),
         Route("/partie/{pid}/supprimer", supprimer_partie, methods=["POST"]),
         Route("/reglages", reglages_page),
