@@ -306,3 +306,33 @@ def test_06_partie_terminee_refusee(thibault, faux, app):
     e["territoires"] = {t: ("allemagne" if n == "france" else n) for t, n in e["territoires"].items()}
     app.state.sauvegarde.enregistrer("thibault", e)
     assert conf(thibault, pid, "x", ["italie", "urss"]).status == 409
+
+
+def test_03_invite_tardif_ne_lit_pas_ce_qui_precede(thibault, faux, app):
+    # relecture : un secret dit avant l'arrivée d'un invité ne doit pas lui être transmis
+    pid = creer(thibault)
+    lancer(thibault, pid, faux, reponses("royaume-uni", "pologne", texte="PLAN-SECRET-X1"),
+           "Notre PLAN-SECRET-X1 contre Berlin", ["royaume-uni", "pologne"])
+    cid = app.state.sauvegarde.lire("thibault", pid)["conferences"][0]["id"]
+    assert inviter(thibault, pid, cid, "etats-unis").status == 200
+    lancer(thibault, pid, faux, reponses("royaume-uni", "pologne", "etats-unis"), "Bienvenue", conference=cid)
+    assert "PLAN-SECRET-X1" not in json.dumps(faux.requetes[-1], ensure_ascii=False)
+    assert "PLAN-SECRET-X1" in json.dumps(faux.requetes[0], ensure_ascii=False)
+
+
+def test_06_invitation_refusee_pendant_la_reponse(thibault, faux, app):
+    pid = creer(thibault)
+    lancer(thibault, pid, faux, reponses("italie", "urss"), "a", ["italie", "urss"])
+    cid = app.state.sauvegarde.lire("thibault", pid)["conferences"][0]["id"]
+    faux.pause, faux.morceau = 0.1, 20
+    faux.programmer(reponses("italie", "urss"))
+    assert conf(thibault, pid, "lent", conference=cid).status == 202
+    assert inviter(thibault, pid, cid, "pologne").status == 409
+    attendre_aide(thibault, pid)
+    assert inviter(thibault, pid, cid, "pologne").status == 200
+
+
+def test_css_bloc_inviter_masquable():
+    from pathlib import Path
+    css = (Path(__file__).resolve().parent.parent / "app" / "static" / "style.css").read_text(encoding="utf-8")
+    assert ".conf-inviter[hidden]" in css

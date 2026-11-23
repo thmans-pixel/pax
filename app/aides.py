@@ -262,7 +262,10 @@ def construire_aide(etat: dict, noms_terr: dict[str, str], genre: str, num_ctx: 
                 raise ValueError("nation inconnue")
             conf = trouver_conference(etat, conference) or {}
             ctx = contexte_conference(etat, invites, noms_terr, nb_ev)
-            hist = _transcription(etat, conf.get("messages"), nb_msg)
+            # Un invité arrivé en cours de route ne doit pas lire ce qui s'est dit avant lui (secrets) :
+            # la transcription repart de la dernière invitation, pour tous.
+            msgs = (conf.get("messages") or [])[int(conf.get("coupure") or 0):]
+            hist = _transcription(etat, msgs, nb_msg)
             corps = "\n".join(ctx) + "\n\n## Conversation jusqu'ici\n" + ("\n".join(hist) or "(rien encore)")
             corps += (f"\n\n## Nouveau message du joueur\n{message}\n\nFais répondre chaque dirigeant, dans l'ordre : "
                       + ", ".join(invites) + ". (objet JSON)")

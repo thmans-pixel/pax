@@ -346,6 +346,8 @@ async def inviter_conference(request: Request):
             return JSONResponse({"ok": False, "message": "Cette conférence n'existe pas."}, status_code=404)
         if moteur.partie_terminee(etat):
             return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
+        if app.state.tours.aide_active(user, pid):
+            return JSONResponse({"ok": False, "message": "Attendez la réponse de l'IA avant d'inviter."}, status_code=409)
         if len(conf["nations"]) >= aides.MAX_CONFERENCE:
             return JSONResponse({"ok": False, "message": f"Une conférence réunit {aides.MAX_CONFERENCE} nations au plus."}, status_code=400)
         if isinstance(nation, str) and nation in conf["nations"]:
@@ -354,6 +356,7 @@ async def inviter_conference(request: Request):
         if faute:
             return JSONResponse({"ok": False, "message": faute}, status_code=400)
         conf["nations"].append(nation)
+        conf["coupure"] = len(conf.get("messages") or [])   # le nouvel invité ne lit pas ce qui précède
         app.state.sauvegarde.enregistrer(user, etat)
     return JSONResponse({"ok": True, "nations": conf["nations"]})
 

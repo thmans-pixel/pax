@@ -131,3 +131,5 @@ label { display: block; margin: 1rem 0 .25rem; font-weight: 600; }
 .conf-choix label { display: block; margin: .15rem 0; }
 .conf-inviter { display: flex; gap: .5rem; align-items: center; margin: .3rem 0; }
 .conf-inviter select { flex: 1; }
+
+.conf-inviter[hidden] { display: none; }
