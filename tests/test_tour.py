@@ -479,6 +479,7 @@ def test_17_fin_de_partie(thibault, faux, app):
     for t, n in e["territoires"].items():                  # la France ne garde qu'un territoire
         if n == "france" and t != "FRA":
             e["territoires"][t] = "allemagne"
+    e["nations"]["france"]["armee"] = 10                   # submergée : la conquête totale est possible
     app.state.sauvegarde.enregistrer("thibault", e)
     assert 'id="fin-partie"' not in thibault.get(f"/partie/{pid}").texte
     rep = reponse(1, guerres=[{"action": "déclaration", "nom": "Chute", "camp_a": ["allemagne"], "camp_b": ["france"]}],
@@ -828,3 +829,29 @@ def test_E5_ancienne_sauvegarde_sans_fronts_lisible(thibault, app):
     e["dernier_tour"] = {"tour": 1, "ordres": ["x"], "duree": "1mois", "issues": []}     # format d'avant : pas de « fronts »
     app.state.sauvegarde.enregistrer("thibault", e)
     assert thibault.get(f"/partie/{pid}").status == 200
+
+
+def test_dernier_territoire_exige_une_armee_double(etat39, noms):
+    # constaté sur thnas : la Chine (un seul territoire) prise par le Japon en un mois
+    g = next(w["nom"] for w in etat39["guerres"] if "japon" in w["camp_a"] + w["camp_b"] and "chine" in w["camp_a"] + w["camp_b"])
+    rep = reponse(1, fronts=[f for f in reponse(1)["fronts"] if f["guerre"] != g] + [
+        {"guerre": g, "avance": "a", "par": "japon", "territoires_pris": ["CHN"], "explication": "x"}])
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["CHN"] == "chine" and any("dernier territoire" in c for c in corr)
+    etat39["nations"]["chine"]["armee"] = 30                       # 70 >= 2 × 30 : submergée
+    neuf, _ = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["CHN"] == "japon"
+
+
+def test_dernier_territoire_aussi_par_la_liste_territoires(etat39, noms):
+    rep = reponse(1, territoires=[{"territoire": "CHN", "vers": "japon", "base": "guerre"}])
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["CHN"] == "chine" and any("dernier territoire" in c for c in corr)
+
+
+def test_reflexion_desactivee_et_comptee(thibault, faux, app):
+    pid = creer(thibault)
+    faux.programmer(reponse(1))
+    assert avancer(thibault, pid).status == 202
+    attendre(thibault, pid)
+    assert faux.requetes[-1]["think"] is False
