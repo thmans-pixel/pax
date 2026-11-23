@@ -366,10 +366,17 @@ async def statut_ia(request: Request):
     return JSONResponse(corps, headers={"Cache-Control": "no-store"})
 
 
+def lire_diagnostic(app) -> str | None:
+    try:
+        return execution.fichier_diagnostic(app.state.config.data).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+
 @protege(admin=True)
 async def reglages_page(request: Request):
     reg = request.app.state.reglages.lire()
-    return page(request, "reglages.html", reg=reg, message=None, faute=None)
+    return page(request, "reglages.html", reg=reg, message=None, faute=None, diagnostic=lire_diagnostic(request.app))
 
 
 @protege(admin=True, ecriture=True)
@@ -379,10 +386,12 @@ async def reglages_enregistrer(request: Request):
     try:
         reg = app.state.reglages.valider(f.get("ollama_adresse", ""), f.get("modele", ""), f.get("contexte", ""))
     except ValueError as e:
-        return page(request, "reglages.html", 400, reg=app.state.reglages.lire(), message=None, faute=str(e))
+        return page(request, "reglages.html", 400, reg=app.state.reglages.lire(), message=None, faute=str(e),
+                    diagnostic=lire_diagnostic(app))
     app.state.reglages.ecrire(reg)
     app.state.cache_statut.clear()
-    return page(request, "reglages.html", reg=reg, message="Réglages enregistrés.", faute=None)
+    return page(request, "reglages.html", reg=reg, message="Réglages enregistrés.", faute=None,
+                diagnostic=lire_diagnostic(app))
 
 
 @protege(admin=True, ecriture=True)

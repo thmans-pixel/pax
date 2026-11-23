@@ -405,3 +405,39 @@ tour » dans la requête du narrateur. Version 0.3.0. Critères cochés : 19, 20
 - Le JavaScript (onglets, clic sur une suggestion, conversation, statut d'attente) dans un vrai navigateur.
 - La qualité des réponses du vrai modèle : JSON respecté, ton des dirigeants, suggestions utilisables ; durée.
 - Essai réel PC éteint pour les aides ; mise à jour du paquet YunoHost en 0.3.0.
+
+## Livraison — étape 4 (réglages d'après la partie réelle)
+
+**Constats d'une vraie partie sur thnas** (gemma4:12b, scénario 1939, France, 14 tours jusqu'en mars 1944) :
+1. La carte n'a jamais bougé : la Pologne entière en 1944 alors que « Invasion de la Pologne » durait encore,
+   l'offensive allemande de mai 1940 (règle datée) n'a jamais eu lieu. Le modèle laissait « territoires » vide malgré
+   les consignes : avec la sortie contrainte d'Ollama, ce que le schéma n'impose pas est omis.
+2. Les chiffres du joueur ne faisaient que monter (armée 100, stabilité 88, influence 100) : chaque variation
+   respectait le plafond par tour, mais rien n'avait de coût.
+3. On ne voyait pas ce que le modèle avait réellement répondu. La guerre France/Allemagne avait disparu sans cause.
+
+**Réglages (version 0.4.0)**
+- **Fronts obligatoires** : nouvelle clé `fronts` du schéma, une entrée par guerre en cours
+  `{guerre, avance (a|b|aucun), par, territoires_pris, explication}`. La requête liste chaque guerre avec ses camps et,
+  par camp, les codes de territoires tenus (30 au plus par camp, « … (+N autres) » au-delà ; il n'y a pas de données
+  de voisinage). Python valide : la guerre existe, les territoires pris appartiennent au camp qui recule, ils vont à
+  `par` (nation vivante du camp qui avance, sinon la première, avec une correction) ; ils comptent dans le même
+  plafond de transferts que « territoires » (compteur unique, fronts traités d'abord). Une guerre en cours absente de
+  `fronts` est signalée en correction. Les règles datées de la période sont recopiées dans « Ce tour » (« À cette date
+  dans l'histoire réelle : … — fais-le arriver, sauf si les ordres du joueur l'empêchent ») et la consigne dit que les
+  fronts les reflètent.
+- **Coûts** : pour chaque nation et chaque tour, la hausse nette (hausses moins baisses, après plafond individuel et
+  cumul) ne dépasse pas le plafond d'un chiffre ; sinon les hausses sont réduites proportionnellement (« au total
+  ramenée »). Au-dessus de 90, une hausse est divisée par deux (arrondi vers le bas), avant le plafond net. Consignes :
+  tout effort a un coût, la guerre use les deux camps, un succès n'augmente pas tout.
+- **Paix** : appliquée seulement si un événement du même tour cite des nations des deux camps ; sinon correction.
+- **Diagnostic** : `data/diagnostic/dernier_tour.txt` (date, partie, modèle, réponse brute de l'IA et relance, 20 000
+  caractères au plus chacune, écrasé à chaque tour, sans identifiant de joueur ni ordres), affiché dans Réglages
+  (administrateurs seulement, dans un `<details>`, échappé). Il peut contenir des événements secrets : voulu.
+- `fronts` n'est pas exigé par la vérification de forme (pas de relance pour cela) : son absence est corrigée guerre
+  par guerre. Les anciennes sauvegardes restent lisibles (`dernier_tour.fronts` est facultatif).
+
+**Limites** : la paix est acceptée dès qu'un événement cite les deux camps (sans contrôle du sujet de l'événement) ;
+le choix des territoires proposés au modèle n'est pas géographique ; l'effet réel de ces consignes sur gemma4:12b
+n'est pas mesuré. **Critère 23 non coché** : à refaire sur thnas (5 tours, carte qui bouge, chiffres qui ne montent plus
+tous ensemble, diagnostic lisible).

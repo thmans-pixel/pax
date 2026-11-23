@@ -8,8 +8,12 @@ from __future__ import annotations
 
 import copy
 import logging
+import os
+import tempfile
 import threading
 import time
+from datetime import datetime
+from pathlib import Path
 
 from .file_ia import FileIA
 from .ollama import OllamaIndisponible, OllamaSilence, DELAI_SILENCE, chat_flux, lister_modeles
@@ -24,6 +28,35 @@ MSG_PC = "Le PC de l'IA ne répond pas."
 def message_attente(n: int) -> str:
     return (f"en attente, {n} demande{'s' if n > 1 else ''} avant vous" if n
             else "en attente, c'est bientôt votre tour")
+
+
+DIAGNOSTIC_MAX = 20000
+
+
+def fichier_diagnostic(data: Path) -> Path:
+    return Path(data) / "diagnostic" / "dernier_tour.txt"
+
+
+def ecrire_diagnostic(data: Path, pid: str, modele: str, reponses: list[str]) -> None:
+    """Garde la dernière réponse brute de l'IA (et la relance éventuelle), écrasée à chaque tour.
+    Ni identifiant de joueur ni ordres : seulement date, partie, modèle et texte (qui peut contenir
+    des secrets du jeu : l'affichage est réservé aux administrateurs)."""
+    try:
+        corps = [f"Date : {datetime.now().isoformat(timespec='seconds')}", f"Partie : {pid}", f"Modèle : {modele}"]
+        for i, texte in enumerate(reponses, 1):
+            texte = texte or ""
+            coupe = len(texte) > DIAGNOSTIC_MAX
+            titre = "Réponse brute" if i == 1 else "Réponse brute après relance"
+            corps += ["", f"===== {titre} ({len(texte)} caractères{', coupée à ' + str(DIAGNOSTIC_MAX) if coupe else ''}) =====",
+                      texte[:DIAGNOSTIC_MAX]]
+        f = fichier_diagnostic(data)
+        f.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=f.parent, suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as h:
+            h.write("\n".join(corps) + "\n")
+        os.replace(tmp, f)
+    except OSError:
+        journal.exception("diagnostic non écrit")      # le diagnostic ne doit jamais faire échouer un tour
 
 
 class Tour:
@@ -284,6 +317,8 @@ class Gestionnaire:
         obj, fautes = t.lire_reponse(texte)
         if obj is not None:
             fautes = t.verifier_forme(obj)
+        premiere = texte
+        ecrire_diagnostic(app.state.config.data, pid, reg["modele"], [premiere])
         if fautes:                                           # une seule relance, qui liste les fautes
             job.relance = True
             echo = texte[:6000]
@@ -296,6 +331,7 @@ class Gestionnaire:
             obj, fautes = t.lire_reponse(texte)
             if obj is not None:
                 fautes = t.verifier_forme(obj)
+            ecrire_diagnostic(app.state.config.data, pid, reg["modele"], [premiere, texte])
             if fautes:
                 raise _Inexploitable(fautes)
         with self.verrou:

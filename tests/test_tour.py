@@ -21,12 +21,17 @@ def faux(app):
         yield f
 
 
+GUERRES_1939 = ["Invasion de la Pologne", "Guerre sino-japonaise", "Combats de Khalkhin Gol"]
+
+
 def reponse(n=1, **plus):
     base = {
         "evenements": [{"date": "1939-09-10", "titre": "Mobilisation en France", "texte": "La France mobilise.",
                         "pays": ["france"], "secret": False}],
         "ordres": [{"numero": i, "issue": "réussi", "explication": f"L'ordre {i} aboutit, malgré les réticences du Parlement et de l'état-major."} for i in range(1, n + 1)],
         "chiffres": [], "relations": [], "guerres": [], "territoires": [], "nouvelle_nation": None,
+        "fronts": [{"guerre": g, "avance": "aucun", "par": "", "territoires_pris": [], "explication": "Front figé."}
+                   for g in GUERRES_1939],
         "resume": "Un mois de mobilisation.", "faits": ["La France a mobilisé."],
     }
     base.update(plus)
@@ -635,3 +640,191 @@ def test_23_duree_et_modele_affiches_dans_le_journal(thibault, faux, app):
     m = e["histoire"][-1]["mesure"]
     assert m["secondes"] >= 0 and m["modele"] and m["relance"] is False
     assert "joué en" in thibault.get(f"/partie/{pid}").texte
+
+
+# ------------------------------------------------------------------ étape 4 : réglages d'après la partie réelle
+def front(guerre="Invasion de la Pologne", avance="a", par="allemagne", pris=(), explication="Offensive."):
+    return {"guerre": guerre, "avance": avance, "par": par, "territoires_pris": list(pris), "explication": explication}
+
+
+def fronts_sauf(*entrees):
+    """Un `fronts` complet : les entrées données, plus « aucun » pour les autres guerres de 1939."""
+    donnes = {e["guerre"] for e in entrees}
+    return list(entrees) + [front(g, "aucun", "", ()) for g in GUERRES_1939 if g not in donnes]
+
+
+def test_E1_un_front_prend_des_territoires_et_la_carte_change(thibault, faux, app):
+    pid = creer(thibault)
+    rep = reponse(1, fronts=fronts_sauf(front(pris=["POL"])))
+    assert jouer(thibault, pid, faux, rep)["etat"] == "termine"
+    e = sauvegarde(app, pid)
+    assert e["territoires"]["POL"] == "allemagne"
+    assert e["dernier_tour"]["fronts"][0]["territoires_pris"] == ["POL"]
+    couleur = e["nations"]["allemagne"]["couleur"]
+    page = thibault.get(f"/partie/{pid}").texte
+    assert re.search(r'id="t-POL"[^>]*fill="%s"|fill="%s"[^>]*id="t-POL"' % (couleur, couleur), page)
+
+
+def test_E1_territoire_qui_n_est_pas_du_camp_qui_recule_refuse(etat39, noms):
+    rep = reponse(1, fronts=fronts_sauf(front(pris=["FRA", "POL"])))     # la France n'est pas dans le camp b
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["FRA"] == "france" and neuf["territoires"]["POL"] == "allemagne"
+    assert any("n'est pas dans le camp qui recule" in c for c in corr)
+    # le camp qui avance est a : on ne peut pas prendre un territoire du camp a
+    rep = reponse(1, fronts=fronts_sauf(front(avance="a", par="allemagne", pris=["DEU"])))
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["DEU"] == etat39["territoires"]["DEU"] and corr
+
+
+def test_E1_par_invalide_ou_defaut_et_avance_illisible(etat39, noms):
+    rep = reponse(1, fronts=fronts_sauf(front(par="france", pris=["POL"])))    # la France n'est pas du camp a
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["POL"] == "allemagne" and any("première nation" in c for c in corr)
+    rep = reponse(1, fronts=fronts_sauf(front(avance="peut-être", pris=["POL"])))
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["territoires"]["POL"] == etat39["territoires"]["POL"]
+    assert any("a, b ou aucun" in c for c in corr)
+    rep = reponse(1, fronts=fronts_sauf(front(guerre="Guerre des étoiles", pris=["POL"])))
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert any("aucune guerre en cours de ce nom" in c for c in corr)
+
+
+def test_E1_plafond_de_transferts_partage_avec_les_fronts(etat39, noms):
+    for t in ("AUT", "CZE", "ITA", "ESP"):
+        etat39["territoires"][t] = "pologne"
+    rep = reponse(1, fronts=fronts_sauf(front(pris=["AUT", "CZE"])),
+                  territoires=[{"territoire": t, "vers": "allemagne", "base": "guerre", "raison": "?"} for t in ("ITA", "ESP")])
+    neuf, corr = appliquer(etat39, noms, rep, "1mois")                 # plafond : 3
+    assert [neuf["territoires"][t] for t in ("AUT", "CZE", "ITA", "ESP")] == ["allemagne"] * 3 + ["pologne"]
+    assert sum("plafond de 3 transferts" in c for c in corr) == 1
+    # et dans l'autre sens : les transferts ordinaires usent aussi le plafond des fronts
+    rep = reponse(1, fronts=fronts_sauf(front(pris=["AUT", "CZE", "ITA"])),
+                  territoires=[{"territoire": "ESP", "vers": "allemagne", "base": "guerre", "raison": "?"}])
+    neuf, corr = appliquer(etat39, noms, rep, "1mois")
+    assert sum(1 for t in ("AUT", "CZE", "ITA", "ESP") if neuf["territoires"][t] == "allemagne") == 3
+
+
+def test_E1_guerre_absente_de_fronts_signalee(etat39, noms):
+    rep = reponse(1, fronts=[front("Guerre sino-japonaise", "aucun", "", ())])
+    neuf, corr = appliquer(etat39, noms, rep)
+    manquantes = [c for c in corr if "absente de « fronts »" in c]
+    assert len(manquantes) == 2 and any("Invasion de la Pologne" in c for c in manquantes)
+    neuf, corr = appliquer(etat39, noms, {k: v for k, v in reponse(1).items() if k != "fronts"})   # clé absente
+    assert sum("absente de « fronts »" in c for c in corr) == 3
+    # une guerre déclarée ce tour n'a pas à figurer dans fronts
+    rep = reponse(1, guerres=[{"action": "déclaration", "nom": "Nouvelle", "camp_a": ["france"], "camp_b": ["allemagne"]}])
+    assert not any("Nouvelle" in c for c in appliquer(etat39, noms, rep)[1])
+
+
+def test_E1_schema_avec_fronts_obligatoire():
+    sch = moteur.schema_reponse()
+    assert "fronts" in sch["required"]
+    item = sch["properties"]["fronts"]["items"]
+    assert set(item["required"]) == {"guerre", "avance", "par", "territoires_pris", "explication"}
+    assert item["properties"]["avance"]["enum"] == ["a", "b", "aucun"]
+
+
+def test_E1_requete_fronts_et_regles_datees(etat39, noms):
+    messages, _ = moteur.construire_requete(etat39, noms, ["x"], "1mois", 16384)
+    texte = messages[-1]["content"]
+    assert "Invasion de la Pologne" in texte and "camp a : allemagne [" in texte and "camp b : pologne [POL]" in texte
+    ce_tour = texte[texte.index("## Ce tour"):texte.index("## La nation du joueur")]
+    assert "À cette date (3 septembre 1939) dans l'histoire réelle" in ce_tour
+    assert "fais-le arriver" in ce_tour and "Royaume-Uni puis la France déclarent la guerre" in ce_tour
+    assert "fronts" in messages[0]["content"] and "OBLIGATOIRE" in messages[0]["content"]
+
+
+def test_E1_liste_de_territoires_bornee(etat39, noms):
+    for i, t in enumerate(list(noms)[:80]):
+        etat39["territoires"][t] = "allemagne"
+    ligne = next(l for l in moteur._lignes_guerres(etat39) if "Pologne" in l)
+    assert "autres)" in ligne and len(ligne) < 700
+
+
+def test_E2_cout_net_plafonne(etat39, noms):
+    rep = reponse(1, chiffres=[{"nation": "france", "chiffre": c, "variation": 5, "raison": "?"}
+                               for c in ("economie", "armee", "stabilite", "influence")])
+    neuf, corr = appliquer(etat39, noms, rep, "1mois")
+    avant, apres = etat39["nations"]["france"], neuf["nations"]["france"]
+    assert sum(apres[c] - avant[c] for c in ("economie", "armee", "stabilite", "influence")) == 5
+    assert any("hausse nette de +20 au total ramenée à +5" in c for c in corr)
+    # les baisses compensent : -5 ailleurs autorise +5 de plus
+    rep = reponse(1, chiffres=[{"nation": "france", "chiffre": "armee", "variation": 5, "raison": "?"},
+                               {"nation": "france", "chiffre": "economie", "variation": 5, "raison": "?"},
+                               {"nation": "france", "chiffre": "stabilite", "variation": -5, "raison": "?"}])
+    neuf, corr = appliquer(etat39, noms, rep, "1mois")
+    assert neuf["nations"]["france"]["armee"] - avant["armee"] + neuf["nations"]["france"]["economie"] - avant["economie"] == 10
+    assert not any("hausse nette" in c for c in corr)
+    # plafond de 1 an : +15 au plus au total
+    rep = reponse(1, chiffres=[{"nation": "france", "chiffre": c, "variation": 15, "raison": "?"}
+                               for c in ("economie", "armee", "stabilite")])
+    neuf, _ = appliquer(etat39, noms, rep, "1an")
+    assert sum(neuf["nations"]["france"][c] - avant[c] for c in ("economie", "armee", "stabilite")) == 15
+
+
+def test_E2_hausse_au_dessus_de_90_divisee_par_deux(etat39, noms):
+    etat39["nations"]["france"]["armee"] = 95
+    etat39["nations"]["france"]["economie"] = 90                      # 90 n'est pas « au-dessus »
+    rep = reponse(1, chiffres=[{"nation": "france", "chiffre": "armee", "variation": 5, "raison": "?"},
+                               {"nation": "france", "chiffre": "economie", "variation": -3, "raison": "?"}])
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert neuf["nations"]["france"]["armee"] == 97                    # 5 // 2 = 2
+    assert neuf["nations"]["france"]["economie"] == 87
+    assert any("divisée par deux" in c for c in corr)
+    etat39["nations"]["france"]["stabilite"] = 90
+    rep = reponse(1, chiffres=[{"nation": "france", "chiffre": "stabilite", "variation": 4, "raison": "?"}])
+    assert appliquer(etat39, noms, rep)[0]["nations"]["france"]["stabilite"] == 94
+
+
+def test_E3_paix_sans_evenement_refusee(etat39, noms):
+    paix = [{"action": "paix", "nom": "Invasion de la Pologne", "camp_a": [], "camp_b": []}]
+    neuf, corr = appliquer(etat39, noms, reponse(1, guerres=paix))
+    assert len(neuf["guerres"]) == len(etat39["guerres"])
+    assert any("refusée" in c and "Invasion de la Pologne" in c for c in corr)
+    # un événement qui ne cite qu'un camp ne suffit pas
+    rep = reponse(1, guerres=paix)
+    rep["evenements"].append({"date": "1939-09-20", "titre": "Fin des combats", "texte": "t", "pays": ["pologne"]})
+    assert len(appliquer(etat39, noms, rep)[0]["guerres"]) == len(etat39["guerres"])
+    # un événement citant les deux camps : la paix est appliquée
+    rep["evenements"].append({"date": "1939-09-25", "titre": "Armistice", "texte": "t", "pays": ["pologne", "allemagne"]})
+    neuf, corr = appliquer(etat39, noms, rep)
+    assert [g["nom"] for g in neuf["guerres"]].count("Invasion de la Pologne") == 0 and not any("refusée" in c for c in corr)
+
+
+def test_E4_diagnostic_ecrit_et_reserve_aux_admins(thibault, lea, faux, app):
+    pid = creer(thibault)
+    secret = "TEXTE-BRUT-<script>alert(1)</script>"
+    rep = reponse(1)
+    rep["resume"] = "Un mois. " + secret
+    jouer(thibault, pid, faux, rep)
+    f = app.state.config.data / "diagnostic" / "dernier_tour.txt"
+    brut = f.read_text(encoding="utf-8")
+    assert "Partie : " + pid in brut and "Modèle : m" in brut and "Date : " in brut and secret in brut
+    assert "thibault" not in brut.lower()                                 # aucune donnée de joueur
+    page = thibault.get("/reglages")
+    assert page.status == 200 and "<details>" in page.texte and "TEXTE-BRUT-&lt;script&gt;" in page.texte
+    assert "<script>alert(1)" not in page.texte                           # échappé
+    assert lea.get("/reglages").status == 403
+    # écrasé au tour suivant, et borné
+    rep2 = reponse(1)
+    rep2["resume"] = "x" * 30000
+    jouer(thibault, pid, faux, rep2)
+    brut = f.read_text(encoding="utf-8")
+    assert secret not in brut and len(brut) < 21000 and "coupée à 20000" in brut
+
+
+def test_E4_diagnostic_garde_la_relance(thibault, faux, app):
+    pid = creer(thibault)
+    faux.programmer("pas du json PREMIERE", reponse(1))
+    avancer(thibault, pid)
+    assert attendre(thibault, pid)["etat"] == "termine"
+    brut = (app.state.config.data / "diagnostic" / "dernier_tour.txt").read_text(encoding="utf-8")
+    assert "PREMIERE" in brut and "après relance" in brut
+
+
+def test_E5_ancienne_sauvegarde_sans_fronts_lisible(thibault, app):
+    pid = creer(thibault)
+    e = sauvegarde(app, pid)
+    e["dernier_tour"] = {"tour": 1, "ordres": ["x"], "duree": "1mois", "issues": []}     # format d'avant : pas de « fronts »
+    app.state.sauvegarde.enregistrer("thibault", e)
+    assert thibault.get(f"/partie/{pid}").status == 200
