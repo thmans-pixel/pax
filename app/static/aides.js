@@ -36,9 +36,113 @@
     return o && o.value ? o.textContent.split(' — ')[0] : 'Dirigeant';
   }
   afficherConversation(convConseiller, donnees.conseiller, 'Conseiller');
-  selectNation.addEventListener('change', function () {
-    afficherConversation(convDiplo, (donnees.diplomatie || {})[selectNation.value], nomNation());
+
+  // -- conférences : plusieurs dirigeants autour d'une même table
+  donnees.conferences = donnees.conferences || [];
+  var vivantes = donnees.vivantes || [];
+  var max = donnees.max_conference || 5;
+  var cases = document.getElementById('conf-cases');
+  var fieldsetNouvelle = document.getElementById('conf-nouvelle');
+  var blocInviter = document.getElementById('conf-inviter');
+  var selectInviter = document.getElementById('conf-inviter-nation');
+  function nomDe(id) { return (donnees.noms || {})[id] || id; }
+  function titreConference(c) {
+    return 'Conférence : ' + c.nations.map(nomDe).join(', ');
+  }
+  function conferenceChoisie() {
+    var v = selectNation.value;
+    if (v.indexOf('conf:') !== 0 || v === 'conf:nouvelle') return null;
+    return donnees.conferences.filter(function (c) { return c.id === v.slice(5); })[0] || null;
+  }
+  function fauteConf(texte) {
+    var f = document.getElementById('conf-faute');
+    if (f) { f.hidden = !texte; f.textContent = texte || ''; }
+  }
+  function remplirOptionsConferences(garder) {
+    Array.prototype.slice.call(selectNation.options).forEach(function (o) {
+      if (o.dataset.conf) selectNation.removeChild(o);
+    });
+    var apres = selectNation.querySelector('option[value="conf:nouvelle"]');
+    var ref = apres ? apres.nextSibling : selectNation.options[1];
+    donnees.conferences.forEach(function (c) {
+      var o = el('option', '', titreConference(c));
+      o.value = 'conf:' + c.id;
+      o.dataset.conf = '1';
+      selectNation.insertBefore(o, ref);
+    });
+    if (garder) selectNation.value = garder;
+  }
+  function remplirCases() {
+    cases.textContent = '';
+    vivantes.forEach(function (id) {
+      var l = el('label');
+      var c = document.createElement('input');
+      c.type = 'checkbox'; c.value = id;
+      c.addEventListener('change', function () {
+        var n = cases.querySelectorAll('input:checked').length;
+        if (n > max) { c.checked = false; fauteConf('Une conférence réunit ' + max + ' nations au plus.'); } else fauteConf('');
+      });
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(' ' + nomDe(id)));
+      cases.appendChild(l);
+    });
+  }
+  function remplirInviter(c) {
+    selectInviter.textContent = '';
+    var restantes = vivantes.filter(function (id) { return c.nations.indexOf(id) < 0; });
+    restantes.forEach(function (id) {
+      var o = el('option', '', nomDe(id)); o.value = id; selectInviter.appendChild(o);
+    });
+    blocInviter.hidden = !(restantes.length && c.nations.length < max);
+  }
+  function afficherConference(c) {
+    convDiplo.textContent = '';
+    c.messages.forEach(function (m) {
+      var qui = nomDe(m.nation) + ((donnees.dirigeants || {})[m.nation] ? ' — ' + donnees.dirigeants[m.nation] : '');
+      bulle(convDiplo, m.role === 'joueur' ? 'joueur' : 'ia', m.texte, qui);
+    });
+  }
+  function actualiserDiplomatie() {
+    var v = selectNation.value, c = conferenceChoisie();
+    fauteConf('');
+    fieldsetNouvelle.hidden = v !== 'conf:nouvelle';
+    blocInviter.hidden = true;
+    if (v === 'conf:nouvelle') { convDiplo.textContent = ''; return; }
+    if (c) { afficherConference(c); remplirInviter(c); return; }
+    afficherConversation(convDiplo, (donnees.diplomatie || {})[v], nomNation());
+  }
+  remplirOptionsConferences();
+  remplirCases();
+  selectNation.addEventListener('change', actualiserDiplomatie);
+  var bInviter = document.getElementById('conf-inviter-bouton');
+  bInviter.addEventListener('click', function () {
+    var c = conferenceChoisie();
+    if (!c || !selectInviter.value) return;
+    fetch(base + '/partie/' + pid + '/conference/' + c.id + '/inviter', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ nation: selectInviter.value })
+    }).then(function (r) { return r.json().then(function (d) { return [r.status, d]; }); })
+      .then(function (x) {
+        if (x[0] === 200) {
+          c.nations = x[1].nations;
+          remplirOptionsConferences('conf:' + c.id);
+          actualiserDiplomatie();
+        } else fauteConf(x[1].message || 'Invitation refusée.');
+      })
+      .catch(function () { fauteConf('Le jeu ne répond pas.'); });
   });
+  // utilisé par la roue : ouvre Diplomatie sur une nation, ou invite à la conférence affichée
+  window.paxDiplomatie = {
+    ouvrir: function (nid) {
+      selectNation.value = nid;
+      actualiserDiplomatie();
+    },
+    conferenceAffichee: function () { return conferenceChoisie(); },
+    inviter: function (nid) {
+      selectInviter.value = nid;
+      bInviter.click();
+    }
+  };
 
   // -- rapport
   function ajouterOrdre(texte, faute) {
@@ -100,6 +204,7 @@
     });
   }
   function dire(genre, texte, alerte) {
+    if (genre === 'conference') genre = 'diplomatie';
     var s = document.getElementById(genre + '-statut'), f = document.getElementById(genre + '-faute');
     if (s) { s.hidden = !texte; s.textContent = texte || ''; }
     if (f) { f.hidden = !alerte; f.textContent = alerte || ''; }
@@ -112,6 +217,17 @@
       donnees.conseiller = (donnees.conseiller || []).concat([{ de: 'joueur', texte: msg }, { de: 'conseiller', texte: r.reponse }]);
       afficherConversation(convConseiller, donnees.conseiller, 'Conseiller');
       document.getElementById('conseiller-texte').value = '';
+    } else if (d.genre === 'conference') {
+      var c = donnees.conferences.filter(function (x) { return x.id === r.conference; })[0];
+      if (!c) { c = { id: r.conference, nations: r.nations, messages: [] }; donnees.conferences.push(c); }
+      c.messages.push({ role: 'joueur', texte: msg });
+      r.reponses.forEach(function (x) { c.messages.push({ role: 'dirigeant', nation: x.nation, texte: x.texte }); });
+      remplirOptionsConferences('conf:' + c.id);
+      actualiserDiplomatie();
+      document.getElementById('diplomatie-texte').value = '';
+      if (r.manquants && r.manquants.length) {
+        dire('diplomatie', '', r.manquants.map(nomDe).join(', ') + (r.manquants.length > 1 ? ' n’ont pas répondu.' : ' n’a pas répondu.'));
+      }
     } else {
       var l = (donnees.diplomatie[r.nation] = (donnees.diplomatie[r.nation] || []).concat([{ de: 'joueur', texte: msg }, { de: 'dirigeant', texte: r.reponse }]));
       if (selectNation.value === r.nation) afficherConversation(convDiplo, l, nomNation());
@@ -166,9 +282,18 @@
   var bD = document.getElementById('diplomatie-envoyer');
   if (bD) bD.addEventListener('click', function () {
     var t = document.getElementById('diplomatie-texte').value.trim();
-    if (!selectNation.value) { dire('diplomatie', '', 'Choisissez une nation.'); return; }
+    var v = selectNation.value;
+    if (!v) { dire('diplomatie', '', 'Choisissez une nation.'); return; }
     if (!t) { dire('diplomatie', '', 'Écrivez un message.'); return; }
-    demander('diplomatie', { message: t, nation: selectNation.value });
+    if (v === 'conf:nouvelle') {
+      var ids = Array.prototype.map.call(cases.querySelectorAll('input:checked'), function (c) { return c.value; });
+      if (ids.length < 2) { dire('diplomatie', '', 'Cochez au moins 2 nations pour une conférence.'); return; }
+      demander('conference', { message: t, nations: ids });
+    } else if (v.indexOf('conf:') === 0) {
+      demander('conference', { message: t, conference: v.slice(5) });
+    } else {
+      demander('diplomatie', { message: t, nation: v });
+    }
   });
 
   suivre('rapport');   // reprend l'affichage si une demande est déjà en cours (page rechargée)

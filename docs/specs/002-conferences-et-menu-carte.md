@@ -55,24 +55,24 @@ s'ouvre sur un pays de la carte pour aller droit aux actions qui le concernent.
 ## Critères d'acceptation
 
 **Conférences**
-1. [ ] Dans Diplomatie, le joueur crée une conférence en choisissant 2 à 5 nations (non
+1. [x] Dans Diplomatie, le joueur crée une conférence en choisissant 2 à 5 nations (non
    disparues, pas la sienne) ; il peut en inviter une de plus ensuite, jusqu'à 5. —
    *Vérification :* test (création, limite, nation refusée).
-2. [ ] Un message du joueur en conférence donne une réponse de **chaque** dirigeant invité,
+2. [x] Un message du joueur en conférence donne une réponse de **chaque** dirigeant invité,
    dans l'ordre, en une seule demande à l'IA (schéma JSON : une entrée par nation invitée,
    toutes les clés obligatoires). Une réponse manquante est signalée sans perdre les autres. —
    *Vérification :* test avec le faux Ollama (une requête, N réponses).
-3. [ ] Qui sait quoi : chaque dirigeant ne reçoit que les événements publics, ceux de la
+3. [x] Qui sait quoi : chaque dirigeant ne reçoit que les événements publics, ceux de la
    conférence, les secrets partagés par **tous** les participants (joueur compris), et ni les
    conversations à deux ni le conseiller. Un secret connu d'un seul invité n'est pas envoyé. —
    *Vérification :* test (marqueurs secrets absents de la requête).
-4. [ ] Ce qui s'est dit en conférence depuis le dernier tour est transmis au narrateur, comme
+4. [x] Ce qui s'est dit en conférence depuis le dernier tour est transmis au narrateur, comme
    les discussions à deux, dans le même budget de contexte (critère 15 de la spec 001). —
    *Vérification :* test.
-5. [ ] Conversations gardées dans la sauvegarde, bornées (60 messages, 20 envoyés à l'IA),
+5. [x] Conversations gardées dans la sauvegarde, bornées (60 messages, 20 envoyés à l'IA),
    messages du joueur limités à 1000 caractères ; anciennes sauvegardes lisibles. —
    *Vérification :* test.
-6. [ ] Même file d'attente, même message « en attente », même comportement PC éteint, pas
+6. [x] Même file d'attente, même message « en attente », même comportement PC éteint, pas
    d'annulation de tour pendant une conférence en cours. — *Vérification :* test.
 
 **Menu roue sur la carte**
@@ -90,7 +90,7 @@ s'ouvre sur un pays de la carte pour aller droit aux actions qui le concernent.
     (textContent seulement). — *Vérification :* test (absence d'innerHTML) et relecture.
 
 **Ensemble**
-11. [ ] `pytest` vert sans Ollama.
+11. [x] `pytest` vert sans Ollama.
 
 ## Conception
 - Sauvegarde : `etat["conferences"]` = liste de `{id, nations: [...], messages: [{role, nation?,
@@ -128,3 +128,32 @@ s'ouvre sur un pays de la carte pour aller droit aux actions qui le concernent.
 ## Questions ouvertes
 Aucune. Réponses de Thibault (23/11/2026) : chaque dirigeant invité répond à son tour ;
 la roue propose les quatre actions (Parler, Ordre, Conseil, Fiche).
+
+## Livraison — étape 1 (conférences, version 0.5.0)
+
+**Fait**
+- `app/aides.py` : genre `conference`, schéma `{"reponses": [{"nation" (enum des invités), "texte"}]}` (toutes les clés
+  obligatoires), consigne, contexte (fiches des invités, relations joueur/invités et entre invités, guerres, événements
+  par **intersection** : publics, ou secrets connus du joueur et de tous les invités), transcription des 20 derniers
+  messages, lecture tolérante (attribution par id ou par nom, inconnu et doublon ignorés, réponse de 600 caractères au
+  plus, ordre des invités), bornes (60 gardés, 1 000 caractères par message du joueur).
+- `app/execution.py` : même file unique, même `Aide`, état relu sous `tours.verrou` avant d'écrire ; la conférence n'est
+  créée dans la sauvegarde qu'une fois l'IA répondue (un échec ne laisse rien d'orphelin) ; `chat_flux` (donc `think:
+  false`) réutilisé ; une seule relance si aucune réponse n'est utilisable ; annulation refusée pendant l'aide (comme
+  avant) ; l'annulation conserve les conférences.
+- `app/main.py` : `POST /partie/{id}/aide` avec `genre=conference` + `nations` (création, 2 à 5) ou `conference` (id) ;
+  `POST /partie/{id}/conference/{cid}/inviter` (5 au plus, nation vivante, pas la sienne, pas deux fois).
+- `app/tour.py` : les conférences du tour courant rejoignent la section « Discussions diplomatiques » (même niveau de
+  raccourcissement que les dialogues à deux).
+- Interface (`partie.html`, `aides.js`, `style.css`) : « + Nouvelle conférence… » et conférences existantes dans la liste
+  de l'onglet Diplomatie, cases à cocher, invitation ; tout texte par `textContent`. Crochet `window.paxDiplomatie`
+  réservé à la roue (étape 2).
+
+**Tests** (`tests/test_conferences.py`, 17 tests) : critère 1 `test_01_*`, 2 `test_02_*`, 3 `test_03_*`, 4 `test_04_*`,
+5 `test_05_*`, 6 `test_06_*`, 11 `pytest tests` vert (130 tests).
+
+**À vérifier à la main** : l'interface de conférence dans un vrai navigateur (créer, inviter, lire les bulles) ; la
+qualité des réponses du vrai modèle (un dirigeant qui parle pour un autre, JSON respecté, durée) ; mise à jour du
+paquet YunoHost en 0.5.0 (non testable hors de thnas).
+
+**Limites** : une conférence ne se supprime pas ; un invité disparu reste affiché mais ne répond plus.

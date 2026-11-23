@@ -10,6 +10,7 @@ import asyncio
 import base64
 import functools
 import re
+import secrets
 import time
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -31,6 +32,7 @@ from .reglages import Reglages
 from .sauvegarde import PartieIntrouvable, Sauvegarde, UTILISATEUR
 from .scenarios import charger_dossiers
 
+CONF_ID = re.compile(r"c[0-9a-f]{6}")
 LONGUEUR_OBJECTIF = 500
 DELAI_STATUT = 3.0          # secondes avant de dire que le PC de l'IA ne répond pas
 VALIDITE_STATUT = 5.0       # on ne redemande pas à Ollama plus souvent
@@ -196,6 +198,11 @@ async def partie(request: Request):
                             key=lambda x: x["nom"].casefold())
     dip = etat.get("diplomatie") or {}
     donnees_aides = {"conseiller": etat.get("conseiller") or [],
+                     "conferences": etat.get("conferences") or [],
+                     "max_conference": aides.MAX_CONFERENCE,
+                     "noms": {nid: n["nom"] for nid, n in etat["nations"].items()},
+                     "dirigeants": {nid: n["dirigeant"] for nid, n in etat["nations"].items()},
+                     "vivantes": [x["id"] for x in interlocuteurs],
                      "diplomatie": {x["id"]: dip.get(x["id"]) or [] for x in interlocuteurs if dip.get(x["id"])},
                      "rapport": etat.get("rapport")}
     return page(request, "partie.html", etat=etat, resume=resume_etat(etat, carte.noms),
@@ -262,6 +269,14 @@ async def demander_aide(request: Request):
             raise ValueError("Aide inconnue.")
         message = aides.nettoyer_message(donnees.get("message")) if genre != "rapport" else ""
         nation = donnees.get("nation") if genre == "diplomatie" else ""
+        conf_id, conf_nations = "", []
+        if genre == "conference":
+            conf_id = donnees.get("conference")
+            conf_nations = donnees.get("nations")
+            if conf_id is not None and not (isinstance(conf_id, str) and CONF_ID.fullmatch(conf_id)):
+                raise ValueError("Conférence inconnue.")
+            if conf_id is None and not isinstance(conf_nations, list):
+                raise ValueError("Choisissez les nations de la conférence.")
     except (ValueError, AttributeError) as e:
         return JSONResponse({"ok": False, "message": str(e) or "Demande mal formée."}, status_code=400)
     if not app.state.reglages.lire()["modele"]:
@@ -279,8 +294,68 @@ async def demander_aide(request: Request):
         if genre == "diplomatie" and not (isinstance(nation, str) and nation in etat["nations"]
                                           and nation != etat["nation_joueur"] and not est_disparue(etat, nation)):
             return JSONResponse({"ok": False, "message": "Choisissez une nation qui existe encore."}, status_code=400)
-        tours.lancer_aide(app, user, pid, genre, message, nation or "")
+        if genre == "conference":
+            if conf_id:
+                conf = aides.trouver_conference(etat, conf_id)
+                if conf is None:
+                    return JSONResponse({"ok": False, "message": "Cette conférence n'existe pas."}, status_code=400)
+                if not any(i in etat["nations"] and not est_disparue(etat, i) for i in conf["nations"]):
+                    return JSONResponse({"ok": False, "message": "Tous les invités ont disparu."}, status_code=400)
+                conf_nations = []
+            else:
+                faute = _verifier_invites(etat, conf_nations, 2)
+                if faute:
+                    return JSONResponse({"ok": False, "message": faute}, status_code=400)
+                conf_id = "c" + secrets.token_hex(3)
+                while aides.trouver_conference(etat, conf_id):
+                    conf_id = "c" + secrets.token_hex(3)
+        tours.lancer_aide(app, user, pid, genre, message, nation or "", conf_id or "", conf_nations)
     return JSONResponse({"ok": True}, status_code=202)
+
+
+def _verifier_invites(etat: dict, nations, minimum: int) -> str | None:
+    """Une faute lisible, ou None si la liste d'invités est valable (2 à 5, vivantes, pas la sienne, sans doublon)."""
+    if not (isinstance(nations, list) and all(isinstance(n, str) for n in nations)):
+        return "Choisissez les nations de la conférence."
+    if len(set(nations)) != len(nations):
+        return "Une nation ne peut être invitée qu'une fois."
+    if not minimum <= len(nations) <= aides.MAX_CONFERENCE:
+        return f"Une conférence réunit de {minimum} à {aides.MAX_CONFERENCE} nations."
+    if any(n not in etat["nations"] or n == etat["nation_joueur"] or est_disparue(etat, n) for n in nations):
+        return "Choisissez des nations qui existent encore, autres que la vôtre."
+    return None
+
+
+@protege(ecriture=True)
+async def inviter_conference(request: Request):
+    """Invite une nation de plus à une conférence (5 au plus)."""
+    app = request.app
+    user, pid, cid = request.state.user, request.path_params["pid"], request.path_params["cid"]
+    try:
+        donnees = await request.json()
+        nation = donnees.get("nation")
+    except (ValueError, AttributeError) as e:
+        return JSONResponse({"ok": False, "message": "Demande mal formée."}, status_code=400)
+    with app.state.tours.verrou:
+        try:
+            etat = app.state.sauvegarde.lire(user, pid)
+        except PartieIntrouvable:
+            return JSONResponse({"ok": False, "message": "Cette partie n'existe pas ou n'est pas à vous."}, status_code=404)
+        conf = aides.trouver_conference(etat, cid)
+        if conf is None:
+            return JSONResponse({"ok": False, "message": "Cette conférence n'existe pas."}, status_code=404)
+        if moteur.partie_terminee(etat):
+            return JSONResponse({"ok": False, "message": "La partie est terminée."}, status_code=409)
+        if len(conf["nations"]) >= aides.MAX_CONFERENCE:
+            return JSONResponse({"ok": False, "message": f"Une conférence réunit {aides.MAX_CONFERENCE} nations au plus."}, status_code=400)
+        if isinstance(nation, str) and nation in conf["nations"]:
+            return JSONResponse({"ok": False, "message": "Cette nation est déjà invitée."}, status_code=400)
+        faute = _verifier_invites(etat, [nation], 1)
+        if faute:
+            return JSONResponse({"ok": False, "message": faute}, status_code=400)
+        conf["nations"].append(nation)
+        app.state.sauvegarde.enregistrer(user, etat)
+    return JSONResponse({"ok": True, "nations": conf["nations"]})
 
 
 @protege()
@@ -432,6 +507,7 @@ def creer_app(config: Config | None = None) -> Starlette:
         Route("/partie/{pid}/tour", progression_tour),
         Route("/partie/{pid}/aide", demander_aide, methods=["POST"]),
         Route("/partie/{pid}/aide", progression_aide),
+        Route("/partie/{pid}/conference/{cid}/inviter", inviter_conference, methods=["POST"]),
         Route("/partie/{pid}/annuler", annuler_tour, methods=["POST"]),
         Route("/partie/{pid}/supprimer", supprimer_partie, methods=["POST"]),
         Route("/reglages", reglages_page),

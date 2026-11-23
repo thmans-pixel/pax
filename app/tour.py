@@ -351,6 +351,20 @@ def _lignes_dialogues(etat: dict, niveau: int) -> list[str]:
             if coupe and len(texte) > coupe:
                 texte = texte[:coupe - 1] + "…"
             lignes.append(f"- {'Le joueur' if m.get('de') == 'joueur' else 'Le dirigeant'} : {texte}")
+    for c in etat.get("conferences") or []:
+        noms = [etat["nations"][i]["nom"] + f" [{i}]" for i in c.get("nations", []) if i in etat["nations"]]
+        recents = [m for m in c.get("messages") or [] if m.get("tour", 0) >= etat["tour"]][-maxi:]
+        if not noms or not recents:
+            continue
+        lignes.append("### Conférence : " + ", ".join(noms))
+        for m in recents:
+            texte = " ".join(str(m.get("texte", "")).split())
+            if coupe and len(texte) > coupe:
+                texte = texte[:coupe - 1] + "…"
+            if m.get("role") == "joueur":
+                lignes.append(f"- Le joueur : {texte}")
+            elif m.get("nation") in etat["nations"]:
+                lignes.append(f"- {etat['nations'][m['nation']]['nom']} : {texte}")
     return lignes
 
 
@@ -425,7 +439,7 @@ def _assembler(etat: dict, noms_terr: dict[str, str], ordres: list[str], duree: 
     dialogues = _lignes_dialogues(etat, dial)
     if dialogues:
         section("Discussions diplomatiques depuis le dernier tour (ce que le joueur a dit ou promis, "
-                "et ce que les dirigeants ont répondu)", dialogues)
+                "et ce que les dirigeants ont répondu, à deux ou en conférence)", dialogues)
     if etat.get("objectif"):
         section("Objectif permanent du joueur", [etat["objectif"]])
     if etat.get("corrections"):
