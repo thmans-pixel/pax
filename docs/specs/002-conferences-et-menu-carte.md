@@ -86,7 +86,7 @@ s'ouvre sur un pays de la carte pour aller droit aux actions qui le concernent.
    disparue ou un territoire sans nation jouable, seulement Fiche. — *Vérification :* à la main.
 9. [ ] La roue se manipule au clavier (Tab, Entrée) et un appui long l'ouvre sur écran tactile ;
    le glisser de la carte (déplacement) n'ouvre pas la roue. — *Vérification :* à la main.
-10. [ ] Aucun texte venant de l'IA ou d'un scénario n'est inséré en HTML dans la roue ou la fiche
+10. [x] Aucun texte venant de l'IA ou d'un scénario n'est inséré en HTML dans la roue ou la fiche
     (textContent seulement). — *Vérification :* test (absence d'innerHTML) et relecture.
 
 **Ensemble**
@@ -157,3 +157,34 @@ qualité des réponses du vrai modèle (un dirigeant qui parle pour un autre, JS
 paquet YunoHost en 0.5.0 (non testable hors de thnas).
 
 **Limites** : une conférence ne se supprime pas ; un invité disparu reste affiché mais ne répond plus.
+
+## Livraison — étape 2 (menu roue, version 0.5.1)
+
+**Fait**
+- `app/static/roue.js` (nouveau) : roue HTML positionnée sur la carte (Parler en haut, Ordre à gauche, Conseil à
+  droite, Fiche en bas, nom de la nation au centre), boutons réels (Tab tourne dans la roue, Entrée valide), Échap ou
+  clic ailleurs ou zoom ferment, appui long de 500 ms sur écran tactile (annulé au-delà de 8 px de déplacement).
+  Sur son pays : pas de « Parler » ; nation disparue ou territoire sans nation : seulement « Fiche ».
+- `app/static/carte.js` : n'annonce le pays à la roue (événement `pax:pays`) que pour un vrai clic, jamais après un
+  glisser (seuil existant de 4 px) ; `innerHTML` retiré (la fiche utilise `textContent`) ; la fiche du bas affiche en
+  plus la relation avec le joueur et les guerres de la nation.
+- Actions : **Ordre** ajoute « Envers <nation> : » dans une ligne vide (ou une nouvelle, limite de 10 respectée, message
+  sinon) ; **Conseil** ouvre le Conseiller avec « Que penses-tu de <nation> ? » dans la saisie, sans l'envoyer ;
+  **Parler** ouvre Diplomatie sur la nation, ou, si une conférence est affichée, demande (confirm) s'il faut y inviter la
+  nation ; **Fiche** affiche et met au point la fiche du bas.
+- `app/monde.py` : `fiche_nation(..., pour_joueur=True)` ajoute relation avec le joueur et guerres (déjà visibles dans
+  l'onglet État) ; l'écran de choix de nation n'en ajoute pas.
+
+**Tests** (`tests/test_roue.py`) : 7 et 8 données de la fiche (relation, guerres, joueur, disparue) ; 7 aucun secret
+(événement secret d'autrui, résumé, faits établis, corrections, conseiller) dans les fiches ; 10 aucun `innerHTML`
+(roue, carte, aides) et `textContent` ; 9 garde-fou de lecture du code (pas une preuve) ; syntaxe `node --check`
+des trois scripts ; 11 `pytest tests` vert (142 tests). Les critères 7, 8 et 9 restent **à vérifier à la main**.
+
+**À vérifier à la main (navigateur)** : clic sur un pays autre que le sien (4 actions, position près des bords), sur son
+pays (3 actions), sur une nation disparue et sur un territoire sans nation (Fiche seule) ; Échap et clic ailleurs ;
+glisser la carte n'ouvre rien ; Tab / Maj+Tab / Entrée dans la roue ; appui long sur tablette ou téléphone (et que le
+relâchement ne ferme pas la roue) ; « Ordre » avec 10 ordres déjà saisis ; « Parler » avec une conférence affichée.
+
+**Limites** : la roue s'ouvre à la souris ou au doigt, pas encore au clavier seul (les pays ne sont pas atteignables
+par Tab) ; sur son propre pays, l'ordre commence par « Pour <nation> : » (et non « Envers ») ; la proposition
+d'invitation utilise la boîte de dialogue du navigateur.

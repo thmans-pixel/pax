@@ -133,3 +133,18 @@ label { display: block; margin: 1rem 0 .25rem; font-weight: 600; }
 .conf-inviter select { flex: 1; }
 
 .conf-inviter[hidden] { display: none; }
+/* menu roue sur la carte */
+.roue { position: absolute; width: 0; height: 0; z-index: 20; }
+.roue[hidden] { display: none; }
+.roue-centre { position: absolute; left: -48px; top: -20px; width: 96px; height: 40px; display: flex; align-items: center;
+  justify-content: center; text-align: center; font-size: .75rem; font-weight: 600; line-height: 1.1; overflow: hidden;
+  border-radius: 99px; background: var(--panneau); border: 1px solid var(--accent); color: var(--texte); padding: 0 .3rem;
+  box-sizing: border-box; pointer-events: none; }
+.roue-action { position: absolute; width: 76px; padding: .4rem 0; border-radius: 99px; border: 1px solid var(--bord);
+  background: #1b2c3e; color: var(--texte); font: inherit; font-size: .85rem; cursor: pointer; text-align: center; }
+.roue-action[hidden] { display: none; }
+.roue-action:hover, .roue-action:focus-visible { border-color: var(--accent); background: #26405a; outline: 2px solid var(--accent); }
+.roue-parler { left: -38px; top: -80px; }
+.roue-fiche { left: -38px; top: 50px; }
+.roue-ordre { left: -128px; top: -15px; }
+.roue-conseil { left: 52px; top: -15px; }

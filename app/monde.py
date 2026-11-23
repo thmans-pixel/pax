@@ -129,16 +129,26 @@ def _guerre_lisible(etat: dict, g: dict) -> dict:
             "depuis": date_fr(g["depuis"]) if g.get("depuis") else ""}
 
 
-def fiche_nation(etat: dict, nid: str, noms_territoires: dict[str, str]) -> dict:
+def fiche_nation(etat: dict, nid: str, noms_territoires: dict[str, str], pour_joueur: bool = False) -> dict:
+    """La fiche d'une nation. `pour_joueur` ajoute ce que la nation du joueur sait : sa relation avec elle
+    et les guerres où elle est engagée (toutes visibles dans l'onglet État). Jamais d'histoire, de fait
+    établi ni d'événement secret."""
     n = etat["nations"][nid]
     terr = territoires_de(etat, nid)
-    return {
+    fiche = {
         "id": nid, "nom": n["nom"], "dirigeant": n["dirigeant"], "regime": n["regime"],
         "majeure": n["majeure"], "couleur": n["couleur"],
         "chiffres": {c: n[c] for c in CHIFFRES},
         "territoires": [noms_territoires.get(t, t) for t in terr],
         "disparue": not terr,
     }
+    if pour_joueur:
+        fiche["joueur"] = nid == etat["nation_joueur"]
+        if nid != etat["nation_joueur"]:
+            note = etat["relations"].get(cle_relation(nid, etat["nation_joueur"]), 0)
+            fiche["relation"] = {"note": note, "palier": palier(note)}
+        fiche["guerres"] = guerres_de(etat, nid)
+    return fiche
 
 
 def resume_etat(etat: dict, noms_territoires: dict[str, str]) -> dict:

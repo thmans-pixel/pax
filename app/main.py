@@ -117,11 +117,11 @@ async def formulaire(request: Request) -> dict[str, str]:
     return {k: v[0] for k, v in parse_qs(corps, keep_blank_values=True).items()}
 
 
-def donnees_carte(carte: Carte, etat: dict) -> dict:
+def donnees_carte(carte: Carte, etat: dict, pour_joueur: bool = False) -> dict:
     return {
         "noms": carte.noms,
         "nations": {nid: n["nom"] for nid, n in etat["nations"].items()},
-        "fiches": {nid: fiche_nation(etat, nid, carte.noms) for nid in etat["nations"]},
+        "fiches": {nid: fiche_nation(etat, nid, carte.noms, pour_joueur) for nid in etat["nations"]},
         "territoires": etat["territoires"],
         "joueur": etat["nation_joueur"],
     }
@@ -206,7 +206,7 @@ async def partie(request: Request):
                      "diplomatie": {x["id"]: dip.get(x["id"]) or [] for x in interlocuteurs if dip.get(x["id"])},
                      "rapport": etat.get("rapport")}
     return page(request, "partie.html", etat=etat, resume=resume_etat(etat, carte.noms),
-                svg=carte.svg(etat["territoires"], etat["nations"]), data=donnees_carte(carte, etat),
+                svg=carte.svg(etat["territoires"], etat["nations"]), data=donnees_carte(carte, etat, True),
                 paliers=PALIERS, libelles=LIBELLES_CHIFFRES, durees=moteur.DUREES,
                 journal=sorted(par_tour.items(), reverse=True), mesures=mesures, fin=moteur.partie_terminee(etat),
                 ordres_saisis=brouillon.get("ordres") or [""],
