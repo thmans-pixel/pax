@@ -2,7 +2,7 @@
 numero: 002
 titre: Conférences diplomatiques et menu roue sur la carte
 depot: autre (thmans-pixel/pax)
-statut: brouillon   # brouillon → validée → en cours → livrée
+statut: en cours    # brouillon → validée → en cours → livrée
 date: 2026-11-23
 ---
 
